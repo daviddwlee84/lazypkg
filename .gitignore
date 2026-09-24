@@ -70,3 +70,8 @@ go.work.sum
 *.local
 .direnv/
 # <<< dev gitignore <<<
+
+# Local lazypkg build outputs
+/bin/
+/lazypkg
+/lazypkg.exe
