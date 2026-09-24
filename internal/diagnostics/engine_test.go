@@ -117,6 +117,47 @@ func TestPATHOwnershipShadowingAndEquivalentLinks(t *testing.T) {
 	}
 }
 
+func TestSpecificPackageBeatsRuntimeBinScan(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, "mise", "installs", "node", "24")
+	script := filepath.Join(root, "lib", "node_modules", "tool", "cli.js")
+	path := filepath.Join(root, "bin", "tool")
+	writeFile(t, script, "script", 0755)
+	linkFile(t, script, path)
+	packages := []domain.Package{{Manager: "mise", ID: "node", Root: root, ExecutablePaths: []string{path}}, {Manager: "npm", ID: "tool", Root: filepath.Dir(script), ExecutablePaths: []string{path, script}}}
+	e := Engine{Runner: &fakeRunner{}, Path: filepath.Dir(path), Dir: dir}
+	r, err := e.Diagnose(context.Background(), "tool", packages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Executables) != 1 || r.Executables[0].Manager != "npm" {
+		t.Fatalf("runtime swallowed exact package owner: %#v", r)
+	}
+}
+
+func TestWholeScanDispatchersAreNotExtraInstallations(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, "mise", "installs", "node", "24")
+	path := filepath.Join(root, "bin", "node")
+	shim := filepath.Join(dir, "mise", "shims", "node")
+	writeFile(t, path, "node", 0755)
+	writeFile(t, shim, "dispatcher", 0755)
+	runner := &fakeRunner{}
+	e := Engine{Runner: runner, Path: filepath.Dir(shim) + ":" + filepath.Dir(path), Dir: dir}
+	r, err := e.Diagnose(context.Background(), "", []domain.Package{{Manager: "mise", ID: "node", Root: root}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range r.Findings {
+		if f.Kind == "shadowed" || f.Kind == "runtime-versions" {
+			t.Fatalf("unresolved dispatcher counted as installation: %#v", r)
+		}
+	}
+	if !findExecutable(t, r, shim).Preferred || findExecutable(t, r, path).Preferred || len(runner.calls) != 0 {
+		t.Fatal("whole scan resolved shims or invented winner", r)
+	}
+}
+
 func TestUnknownRuntimeAndNonExecutable(t *testing.T) {
 	dir := t.TempDir()
 	a := filepath.Join(dir, "a")

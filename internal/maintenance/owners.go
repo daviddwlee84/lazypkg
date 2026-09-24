@@ -67,9 +67,22 @@ func (e *Engine) brewOwner(ctx context.Context, o *observation) bool {
 		h.Owner = "brew"
 		h.OwnerPath = brew
 		h.OwnerPackage = pkg
+		h.GuideURL = "https://docs.brew.sh/Manpage"
+		o.Binding = append(o.Binding, identity(brew), text)
+		formulaName, _, _ := strings.Cut(pkg, "@")
+		formulaVersion, _, _ := strings.Cut(parts[1], "_")
+		installed, installedOK := version(formulaVersion)
+		component, componentOK := version(h.Version)
+		if (formulaName != h.Manager && formulaName != executableName(h.Manager)) || !installedOK || !componentOK || installed.compare(component) != 0 {
+			h.Recommendation = "Homebrew records this executable under " + pkg + ", but a matching component/formula version was not established. Review the owning formula and its bundled component separately; no automatic host or runtime update is planned."
+			return true
+		}
+		if h.ReasonCode != "" && h.ReasonCode != "ready" && h.ReasonCode != "version_unsupported" {
+			h.Recommendation = "The selected component probe needs repair before comparing its Homebrew update target. Inspect the reported probe issue and the owning formula " + pkg + "."
+			return true
+		}
 		h.Strategy = "brew-package"
 		h.CandidateVersion = f.Versions.Stable
-		h.GuideURL = "https://docs.brew.sh/Manpage"
 		h.Recommendation = "Upgrade the owning Homebrew formula only; its native dependency changes will be shown by Homebrew."
 		h.UpdateStatus = "unknown"
 		if a, ok := version(h.Version); ok {
@@ -81,7 +94,6 @@ func (e *Engine) brewOwner(ctx context.Context, o *observation) bool {
 				}
 			}
 		}
-		o.Binding = append(o.Binding, identity(brew), text)
 		return true
 	}
 	return false

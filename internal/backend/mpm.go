@@ -88,7 +88,7 @@ func (m *MPM) Recheck(ctx context.Context) error {
 // Config is temporary, explicit, and independent of the user's/project's mpm
 // configuration. mpm 8.0.1's Go adapter inherits the incorrect --version probe;
 // its documented version_cli_options override supplies Go's native subcommand.
-const isolatedConfig = `{"mpm":{"suggest_contribs":false,"overrides":{"go":{"version_cli_options":["version"]}}}}`
+const isolatedConfig = `{"mpm":{"suggest_contribs":false,"overrides":{"go":{"version_cli_options":["version"]},"yazi":{"version_regexes":["^Ya[ \\t]+(?P<version>\\S+)","(?m)^[ \\t]*Version:[ \\t]+(?P<version>\\S+)"]}}}}`
 
 func (m *MPM) command(args ...string) (domain.Command, func(), error) {
 	f, err := os.CreateTemp("", "lazypkg-mpm-*.json")
@@ -111,6 +111,10 @@ func (m *MPM) command(args ...string) (domain.Command, func(), error) {
 	for k, v := range m.Env {
 		env[k] = v
 	}
+	// A reviewed single-package action must not auto-remove unrelated formulae
+	// or trigger cleanup through inherited Homebrew preferences.
+	env["HOMEBREW_NO_AUTOREMOVE"] = "1"
+	env["HOMEBREW_NO_INSTALL_CLEANUP"] = "1"
 	return domain.Command{Path: m.Path, Args: a, Env: env, Unset: []string{"MPM_*"}}, cleanup, nil
 }
 func (m *MPM) query(ctx context.Context, args ...string) (process.Result, error) {
@@ -207,28 +211,11 @@ func (m *MPM) Managers(ctx context.Context) ([]domain.Manager, error) {
 		if !known || !v.Supported {
 			continue
 		}
-		status := "missing"
-		reason := "Executable was not found in the current environment"
-		switch {
-		case !v.Supported:
-			status = "unsupported platform"
-			reason = "This manager is not supported on the current platform"
-		case v.Available:
-			status = "available"
-			reason = ""
-		case v.Path != "" && !v.Executable:
-			status = "not executable"
-			reason = "The detected launcher could not be executed"
-		case v.Path != "" && v.Version == "":
-			status = "version unknown"
-			reason = "The detected launcher did not return a parseable version"
-		case v.Path != "" && !v.Fresh:
-			status = "version unsupported"
-			reason = e.Reason
-		case v.Path != "":
-			status = "unavailable"
+		status, reasonCode, reason := "available", "ready", ""
+		if !v.Available {
+			status, reasonCode, reason = m.componentReason(e, v)
 		}
-		out = append(out, domain.Manager{ID: e.ID, BackendID: e.BackendID, Name: e.Name, Path: v.Path, Version: v.Version, Supported: v.Supported, Available: v.Available, Status: status, Capabilities: Capabilities(e.ID), Errors: errorStrings(v.Errors), Requirement: e.Requirement, Reason: reason, Scope: e.Scope, Groups: e.Groups, Maintained: e.Maintained, SourceURL: e.SourceURL})
+		out = append(out, domain.Manager{ID: e.ID, BackendID: e.BackendID, Name: e.Name, Path: v.Path, Version: v.Version, Supported: v.Supported, Available: v.Available, Status: status, Capabilities: Capabilities(e.ID), Errors: errorStrings(v.Errors), Requirement: e.Requirement, Reason: reason, ReasonCode: reasonCode, ComponentKind: e.ComponentKind, VersionSubject: e.VersionSubject, Launcher: e.Launcher, Scope: e.Scope, Groups: e.Groups, Maintained: e.Maintained, SourceURL: e.SourceURL})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Available != out[j].Available {

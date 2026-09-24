@@ -53,6 +53,9 @@ usable width. Manager filters, selection and queries survive view changes.
 | `[` / `]`, `S` in the picker | Reorder managers / save a named set |
 | `b` in Managers | Toggle detected managers / full platform catalog |
 | `M` | Toggle mouse support |
+| `R` in Diagnostics | Assess installations and choose which one to retain |
+| `U` in Managers | Open the maintenance queue; review each job individually |
+| `p` on a command/manager | Preview a prompt; `c` copies and `e` exports it |
 | `/` | Filter locally; in Discover, type and Enter to search |
 | `Enter` | Details / accept filter |
 | `i`, `u`, `x` | Review install, upgrade, removal when supported |
@@ -66,6 +69,15 @@ Typing owns printable keys. A package action first prepares an exact plan;
 released, then an acknowledgement returns to the dashboard. Views remain
 usable during reads; failed providers do not erase their previously shown
 installed records.
+
+Installed and Updates publish one provider at a time. Basic package records are
+usable before slower providers or ownership enrichment finish; progress and
+provider errors remain visible. Identical in-flight reads are shared. The
+60-second memory cache covers both views, and a private disk cache can seed rows
+observed within the past 24 hours on reopening. Disk rows always start as stale
+and unverified; a background live read replaces them. Refresh with `r` or the
+CLI's `--refresh`. Actions require a fresh provider result and still prepare a
+new validated plan. Disable disk storage with `query_cache = false`.
 
 Mouse support is enabled by default: click tabs, rows, manager filters and
 overlay controls, or scroll with the wheel. Use `--mouse=false` or `mouse = false`
@@ -104,6 +116,13 @@ lazypkg managers --detected --json
 lazypkg managers check npm --refresh
 lazypkg managers upgrade npm --dry-run
 lazypkg managers upgrade npm --yes
+lazypkg managers maintain --dry-run --json
+lazypkg managers maintain --interactive
+lazypkg resolve yt-dlp --json
+lazypkg resolve yt-dlp --interactive
+lazypkg resolve yt-dlp --keep INSTALLATION_ID --remove OTHER_ID --dry-run
+lazypkg prompt render path-conflict yt-dlp --output review.md
+lazypkg prompt render manager-repair npm --copy
 lazypkg setup --json                 # list setup choices without a prompt
 lazypkg setup mpm mise --dry-run
 lazypkg setup mpm --yes
@@ -180,6 +199,38 @@ Groups describe catalog membership; they do not bypass the scope policy.
   repair. Cargo nonstandard configured roots and unsupported ownership sources
   can remain unknown. Reads are bounded and partial coverage is reported.
 
+## Resolving command conflicts
+
+Diagnostics groups symlinks and shims of one installation separately from
+independent copies. `R` / `resolve` inspects a focused command, then lets you
+choose a retained installation and review one removal at a time. The plan binds
+both installations, their manager contexts and the expected PATH result.
+
+Assessment covers all 17 enabled global/user providers with removal capability.
+Reviewed removal preflights currently support Homebrew formulae, uv tools and
+exact npm global prefixes. Other providers, runtime coexistence, missing source
+evidence and unknown transaction effects produce guidance and a prompt instead
+of an executable removal. A same command name alone does not prove two packages
+are the same project. Precise package entrypoints take precedence over inferred
+runtime directory ownership.
+
+The npm prefix recipe currently supports the verified macOS/Linux layout.
+Windows npm shims and uv launchers that cannot be proven to point into their
+registered environment remain guidance-only.
+
+Homebrew reverse dependencies block removal. For example, if `summarize`
+depends on Homebrew's `yt-dlp`, keeping uv's preferred `yt-dlp` does not make
+the Brew dependency removable. Choosing to retain Brew can instead prepare a
+review of removing the uv tool. Homebrew autoremove/cleanup is disabled for
+scoped operations. uv plans list the entire tool environment and its commands.
+npm plans bind an explicit prefix, Node interpreter and npm CLI; an incompatible
+selected npm must first be repaired through a separately approved plan. No
+runtime is removed merely because one of its global commands is shadowed.
+
+After execution, lazypkg verifies the removed record, the retained entrypoint
+and the new inherited-PATH result. It does not run arbitrary discovered tools
+to test functionality or clear the parent shell's command cache.
+
 ## Manager compatibility and updates
 
 `managers check` checks the selected executable and its proven installation
@@ -204,6 +255,34 @@ the selected result afterward. Project overrides may still take precedence.
 If compatibility or ownership cannot be proved, the UI explains alternatives.
 The current Aqua recipe is not applied on Windows.
 
+`U` / `managers maintain --interactive` presents actionable updates, repair
+guidance and already-current managers in one queue. It honors explicit selection
+flags and otherwise considers detected managers. Confirm each plan with `y`,
+skip a job or stop; there is no blanket queue approval. Each completed operation
+is acknowledged before the queue is rechecked. Shared Homebrew and uv update
+targets are grouped, while unrelated components using the same launcher stay
+separate.
+
+A warning does not always mean an old version. Details distinguish an old
+component from a failed version probe, a missing shell-plugin source and a
+protected system environment. The pinned Yazi adapter recognizes both old and
+multiline version output. Finding zsh, Python or Neovim alone does not authorize
+upgrading that host as a repair for one of its components.
+
+## Advisory prompt handoff
+
+`prompt render path-conflict <command>` and `prompt render manager-repair
+[manager]` collect a bounded read-only snapshot and render a versioned Markdown
+prompt. The context includes relevant paths, versions, ownership/dependency
+evidence, coverage, observation age and known limitations. It excludes full
+environment dumps, configuration contents and credentials.
+
+The TUI offers preview, Copy and Export. CLI output, `--copy` and `--output`
+use the same rendered bytes; JSON contains the prompt and its context. Export
+creates a private new file and refuses to overwrite existing files. Clipboard
+failure leaves the prompt available for manual copying. Generating a prompt
+does not launch an agent or execute its suggested operations.
+
 ## Configuration
 
 No config file is required. On macOS/Linux, use
@@ -218,6 +297,7 @@ timeout_seconds = 30
 # Optional default query selection; an explicit --manager overrides it:
 # managers = ["brew", "cask", "mise", "uvx"]
 mouse = true
+query_cache = true
 manager_order = ["brew", "mise", "uvx", "cargo"]
 default_manager_set = "daily"
 
@@ -255,6 +335,7 @@ python3 scripts/pty_smoke.py
 # Optional native checks in disposable environments (requires installed tools):
 python3 scripts/integration_uv.py --mpm /absolute/path/to/mpm
 python3 scripts/integration_manager_npm.py --mpm /absolute/path/to/mpm --mise /absolute/path/to/mise --node /absolute/path/to/node
+LAZYPKG_BENCH_MPM=/absolute/path/to/mpm go test ./internal/app -run TestLiveProgressiveQueries -count=1 -v
 LAZYPKG_TEST_MISE=/absolute/path/to/mise go test ./internal/backend -run TestMiseLiveGlobalScope -v
 ```
 

@@ -25,6 +25,7 @@ import (
 )
 
 type App struct {
+	Version        string
 	Config         config.Config
 	Runner         process.Runner
 	Bootstrap      *bootstrap.Engine
@@ -34,9 +35,19 @@ type App struct {
 	writeMu        sync.Mutex
 	cacheMu        sync.Mutex
 	inventory      map[string]domain.Snapshot
+	updateCache    map[string]domain.Snapshot
+	providerJobs   sharedWork[*backend.MPM]
+	managerJobs    sharedWork[[]domain.Manager]
+	queryJobs      sharedWork[domain.Snapshot]
+	enrichmentJobs sharedWork[domain.Snapshot]
+	limitsOnce     sync.Once
+	querySem       chan struct{}
+	enrichmentSem  chan struct{}
+	diskMu         sync.Mutex
 	managerCache   []domain.Manager
 	managerCacheAt time.Time
 	cacheEpoch     uint64
+	memoryContext  string
 	maintenance    *maintenance.Engine
 	maintenanceEnv map[string]string
 }
@@ -47,19 +58,35 @@ func New(c config.Config) *App {
 }
 func (a *App) provider(ctx context.Context) (*backend.MPM, error) {
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	path := a.Config.MPMPath
-	if path == "" {
-		var err error
-		path, err = a.Bootstrap.ResolveMPM(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("mpm backend unavailable: %w; run lazypkg setup", err)
+	cfg, env := a.Config, a.childEnvLocked()
+	if a.mpm != nil && (cfg.MPMPath == "" || a.mpm.Path == cfg.MPMPath) {
+		m := a.mpm
+		a.mu.Unlock()
+		return m, nil
+	}
+	a.mu.Unlock()
+	a.cacheMu.Lock()
+	epoch := a.cacheEpoch
+	a.cacheMu.Unlock()
+	return a.providerJobs.do(ctx, fmt.Sprintf("%d:%s", epoch, cfg.MPMPath), func(work context.Context) (*backend.MPM, error) {
+		path := cfg.MPMPath
+		if path == "" {
+			var err error
+			path, err = a.Bootstrap.ResolveMPM(work)
+			if err != nil {
+				return nil, fmt.Errorf("mpm backend unavailable: %w; run lazypkg setup", err)
+			}
 		}
-	}
-	if a.mpm == nil || a.mpm.Path != path {
-		a.mpm = &backend.MPM{Path: path, Runner: a.Runner, Timeout: a.Config.Timeout(), Env: a.childEnvLocked()}
-	}
-	return a.mpm, nil
+		m := &backend.MPM{Path: path, Runner: a.Runner, Timeout: cfg.Timeout(), Env: env}
+		a.mu.Lock()
+		a.cacheMu.Lock()
+		if a.cacheEpoch == epoch {
+			a.mpm = m
+		}
+		a.cacheMu.Unlock()
+		a.mu.Unlock()
+		return m, nil
+	})
 }
 func (a *App) Diagnose(ctx context.Context, name string) (domain.DiagnosticReport, error) {
 	s, err := a.Packages(ctx, "installed", "", "")
@@ -160,6 +187,9 @@ func (a *App) Plan(ctx context.Context, req domain.ActionRequest) (domain.Action
 		if e != nil {
 			p.Warnings = append(p.Warnings, "Existing installations could not be checked: "+e.Error())
 		}
+		if !freshInventory(inventory, req.Manager) {
+			return p, fmt.Errorf("cannot verify fresh %s inventory; refresh or repair that provider before installation", req.Manager)
+		}
 		for _, item := range inventory.Packages {
 			if !sameID(req.Manager, item.ID, req.Package) {
 				continue
@@ -177,6 +207,9 @@ func (a *App) Plan(ctx context.Context, req domain.ActionRequest) (domain.Action
 		s, e := a.packages(ctx, "installed", "", req.Manager, false)
 		if e != nil {
 			return p, e
+		}
+		if !freshInventory(s, req.Manager) {
+			return p, fmt.Errorf("cannot verify fresh %s inventory; retained or partial rows cannot authorize %s", req.Manager, req.Operation)
 		}
 		if len(s.Issues) > 0 {
 			for _, issue := range s.Issues {
@@ -275,6 +308,11 @@ func (a *App) Execute(ctx context.Context, p domain.ActionPlan, in io.Reader, ou
 		return domain.ActionResult{}, fmt.Errorf("another operation is already running")
 	}
 	defer a.writeMu.Unlock()
+	if p.Kind == "resolution" {
+		result, err := a.resolutionEngine().Execute(ctx, p, in, out, errout)
+		a.invalidateInventory()
+		return result, err
+	}
 	if p.Kind == "manager" {
 		engine := a.maintenanceEngine()
 		result, err := engine.Execute(ctx, p, in, out, errout)
@@ -407,6 +445,15 @@ func sameID(manager, a, b string) bool {
 		return strings.EqualFold(a, b)
 	}
 	return a == b
+}
+
+func freshInventory(s domain.Snapshot, id string) bool {
+	for _, c := range s.Coverage {
+		if c.Manager == id {
+			return c.State == "complete" && !c.Stale
+		}
+	}
+	return false
 }
 
 type environmentRunner struct {

@@ -72,6 +72,20 @@ func (s *sessionService) Query(ctx context.Context, q domain.PackageQuery) (doma
 	return s.Service.Query(ctx, q)
 }
 
+func (s *sessionService) StreamQuery(ctx context.Context, q domain.PackageQuery) <-chan domain.QueryEvent {
+	if q.Managers == nil && q.Group == "" && q.Set == "" {
+		q.Managers = append([]string(nil), s.ids...)
+	}
+	return s.Service.StreamQuery(ctx, q)
+}
+
+func (s *sessionService) MaintenanceQueue(ctx context.Context, ids []string, refresh bool) (domain.MaintenanceQueue, error) {
+	if ids == nil {
+		ids = append([]string(nil), s.ids...)
+	}
+	return s.Service.MaintenanceQueue(ctx, ids, refresh)
+}
+
 func (s *sessionService) Preferences(ctx context.Context) (domain.ManagerPreferences, error) {
 	p, err := s.Service.Preferences(ctx)
 	p.Default = append([]string(nil), s.ids...)
@@ -202,6 +216,7 @@ func managerCommands(o *options) *cobra.Command {
 	upgrade.Flags().BoolVar(&dry, "dry-run", false, "Show the bound update plan without changing tools")
 	upgrade.Flags().BoolVarP(&yes, "yes", "y", false, "Approve the reviewed manager update")
 	cmd.AddCommand(upgrade)
+	cmd.AddCommand(maintenanceCommand(o))
 	return cmd
 }
 func setCommands(o *options) *cobra.Command {

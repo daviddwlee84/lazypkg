@@ -588,3 +588,44 @@ func (f *fakeService) CheckManagers(context.Context, []string, bool) ([]domain.M
 func (f *fakeService) PlanManagerUpdate(_ context.Context, id string) (domain.ActionPlan, error) {
 	return domain.ActionPlan{Title: "Update manager " + id, Kind: "manager-update"}, nil
 }
+
+func fixtureStream(snapshot domain.Snapshot, err error) <-chan domain.QueryEvent {
+	events := make(chan domain.QueryEvent, len(snapshot.Packages)+len(snapshot.Coverage)+2)
+	if len(snapshot.Coverage) == 0 {
+		seen := map[string]bool{}
+		for _, p := range snapshot.Packages {
+			if !seen[p.Manager] {
+				seen[p.Manager] = true
+				snapshot.Coverage = append(snapshot.Coverage, domain.Coverage{Manager: p.Manager, State: "complete", ObservedAt: time.Now()})
+			}
+		}
+	}
+	for _, coverage := range snapshot.Coverage {
+		batch := domain.Snapshot{Coverage: []domain.Coverage{coverage}, ObservedAt: snapshot.ObservedAt}
+		for _, p := range snapshot.Packages {
+			if p.Manager == coverage.Manager {
+				batch.Packages = append(batch.Packages, p)
+			}
+		}
+		events <- domain.QueryEvent{Stage: "base", Manager: coverage.Manager, Snapshot: batch}
+	}
+	events <- domain.QueryEvent{Stage: "done", Snapshot: snapshot, Err: err}
+	close(events)
+	return events
+}
+func (f *fakeService) StreamQuery(ctx context.Context, q domain.PackageQuery) <-chan domain.QueryEvent {
+	s, err := f.Query(ctx, q)
+	return fixtureStream(s, err)
+}
+func (f *fakeService) AssessConflict(context.Context, string) (domain.ConflictAssessment, error) {
+	return domain.ConflictAssessment{}, nil
+}
+func (f *fakeService) PlanResolution(context.Context, domain.ResolutionRequest) (domain.ActionPlan, error) {
+	return domain.ActionPlan{}, nil
+}
+func (f *fakeService) MaintenanceQueue(context.Context, []string, bool) (domain.MaintenanceQueue, error) {
+	return domain.MaintenanceQueue{}, nil
+}
+func (f *fakeService) RenderPrompt(context.Context, domain.PromptRequest) (domain.RenderedPrompt, error) {
+	return domain.RenderedPrompt{Markdown: "# Fixture prompt\n\nCurrent context only.\n"}, nil
+}

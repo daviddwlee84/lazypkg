@@ -112,7 +112,7 @@ func TestLateManagerDetectionCannotRepopulateAfterInvalidation(t *testing.T) {
 	}
 }
 
-func TestOverlappingReadsCannotReplaceNewerCacheInSameEpoch(t *testing.T) {
+func TestOverlappingReadsShareWorkInSameEpoch(t *testing.T) {
 	for _, managers := range []bool{false, true} {
 		name := "inventory"
 		if managers {
@@ -135,20 +135,21 @@ func TestOverlappingReadsCannotReplaceNewerCacheInSameEpoch(t *testing.T) {
 				}
 				return s.Packages[0].Version, nil
 			}
-			done := make(chan error, 1)
+			done := make(chan error, 2)
 			go func() { _, err := read(); done <- err }()
 			<-r.started
-			newer, err := read()
-			if err != nil {
-				t.Fatal(err)
-			}
+			go func() { _, err := read(); done <- err }()
 			close(r.release)
-			if err := <-done; err != nil {
+			for range 2 {
+				if err := <-done; err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := read(); err != nil {
 				t.Fatal(err)
 			}
-			cached, err := read()
-			if err != nil || cached != newer {
-				t.Fatal("old request replaced newer cache", newer, cached, err)
+			if r.managerCalls != 1 || !managers && r.inventoryCalls != 1 {
+				t.Fatal("identical reads were duplicated", r.managerCalls, r.inventoryCalls)
 			}
 		})
 	}
@@ -209,7 +210,7 @@ func (r *enrichmentRunner) Output(ctx context.Context, c domain.Command) (proces
 	}
 }
 
-func TestCancellationDuringEnrichmentDoesNotCacheInventory(t *testing.T) {
+func TestCancellationDuringEnrichmentRetainsPublishedBase(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	r := &enrichmentRunner{cancel: cancel, cellar: t.TempDir()}
@@ -221,8 +222,8 @@ func TestCancellationDuringEnrichmentDoesNotCacheInventory(t *testing.T) {
 	if _, err := a.Query(context.Background(), q); err != nil {
 		t.Fatal(err)
 	}
-	if r.reads != 2 {
-		t.Fatal("cancelled read populated inventory cache", r.reads)
+	if r.reads != 1 {
+		t.Fatal("cancelled enrichment discarded completed inventory", r.reads)
 	}
 }
 func TestExplicitEmptySelectionDoesNotExpandToDefaults(t *testing.T) {
@@ -241,5 +242,40 @@ func TestCoverageMarksUnqueriedPlatforms(t *testing.T) {
 	}
 	if len(s.Coverage) != 2 || s.Coverage[0].State != "complete" || s.Coverage[1].State != "unsupported" {
 		t.Fatal(s.Coverage)
+	}
+}
+
+type failedInventoryRunner struct {
+	actionRunner
+	fail bool
+}
+
+func (r *failedInventoryRunner) Output(ctx context.Context, c domain.Command) (process.Result, error) {
+	if r.fail && strings.Contains(strings.Join(c.Args, " "), " installed") {
+		return process.Result{Stdout: `{"winget":{"packages":[],"errors":["native inventory failed"]}}`}, nil
+	}
+	return r.actionRunner.Output(ctx, c)
+}
+func TestMutationPlanCannotUseStaleFallbackInventory(t *testing.T) {
+	r := &failedInventoryRunner{actionRunner: actionRunner{installed: true}}
+	a := testApp(t, r)
+	if _, err := a.Query(context.Background(), domain.PackageQuery{Kind: "installed", Managers: []string{"winget"}}); err != nil {
+		t.Fatal(err)
+	}
+	r.fail = true
+	for _, op := range []string{"remove", "upgrade", "install"} {
+		_, err := a.Plan(context.Background(), domain.ActionRequest{Operation: op, Manager: "winget", Package: "Test.Tool"})
+		if err == nil || !strings.Contains(err.Error(), "fresh winget inventory") {
+			t.Fatal("stale data authorized mutation", op, err)
+		}
+	}
+	if len(r.runs) > 0 {
+		t.Fatal("preflight mutated")
+	}
+}
+func TestEmptyMaintenanceSelectionDoesNotDiscoverAllManagers(t *testing.T) {
+	a := New(config.Config{MPMPath: "must-not-run"})
+	if _, err := a.CheckManagers(context.Background(), []string{}, false); err == nil {
+		t.Fatal("empty scope expanded")
 	}
 }

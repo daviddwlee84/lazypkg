@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/daviddwlee84/lazypkg/internal/catalog"
 	"github.com/daviddwlee84/lazypkg/internal/domain"
 	"github.com/daviddwlee84/lazypkg/internal/process"
 )
@@ -77,6 +78,8 @@ func (e *Engine) command(path string, args ...string) domain.Command {
 	for k, v := range e.ChildEnv() {
 		env[k] = v
 	}
+	env["HOMEBREW_NO_AUTOREMOVE"] = "1"
+	env["HOMEBREW_NO_INSTALL_CLEANUP"] = "1"
 	return domain.Command{Path: path, Args: args, Dir: e.Dir, Env: env}
 }
 func (e *Engine) output(ctx context.Context, c domain.Command) (string, error) {
@@ -88,6 +91,7 @@ func (e *Engine) output(ctx context.Context, c domain.Command) (string, error) {
 	}
 	env["MISE_AUTO_INSTALL"] = "0"
 	env["MISE_NOT_FOUND_AUTO_INSTALL"] = "false"
+	env["GOTOOLCHAIN"] = "local"
 	c.Env = env
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -285,13 +289,18 @@ type cacheRecord struct {
 	Health domain.ManagerHealth `json:"health"`
 }
 
+// Revision 2 distinguishes a hosted component from its launcher. Old records
+// could incorrectly route a missing shell plugin to the shell's package owner.
+const healthCacheSchema = 2
+const healthFingerprintRevision = "component-ownership-v2"
+
 func (e *Engine) cached(key string) (domain.ManagerHealth, bool) {
 	var c cacheRecord
 	if e.CacheDir == "" || key == "" {
 		return c.Health, false
 	}
 	err := readJSON(filepath.Join(e.CacheDir, key+".json"), &c)
-	return c.Health, err == nil && c.Schema == 1 && c.Health.Fingerprint == key
+	return c.Health, err == nil && c.Schema == healthCacheSchema && c.Health.Fingerprint == key
 }
 func (e *Engine) save(h domain.ManagerHealth) {
 	if e.CacheDir == "" || h.Fingerprint == "" {
@@ -306,7 +315,7 @@ func (e *Engine) save(h domain.ManagerHealth) {
 	}
 	defer os.Remove(f.Name())
 	_ = f.Chmod(0600)
-	err = json.NewEncoder(f).Encode(cacheRecord{1, h})
+	err = json.NewEncoder(f).Encode(cacheRecord{healthCacheSchema, h})
 	closeErr := f.Close()
 	if err == nil && closeErr == nil {
 		_ = os.Rename(f.Name(), filepath.Join(e.CacheDir, h.Fingerprint+".json"))
@@ -314,7 +323,15 @@ func (e *Engine) save(h domain.ManagerHealth) {
 }
 
 func (e *Engine) observe(ctx context.Context, m domain.Manager) observation {
-	h := domain.ManagerHealth{Manager: m.ID, Path: m.Path, Version: m.Version, Requirement: m.Requirement, Compatible: m.Available, Reason: m.Reason, UpdateStatus: "not-checked", GuideURL: m.SourceURL}
+	h := domain.ManagerHealth{Manager: m.ID, Path: m.Path, Version: m.Version, Requirement: m.Requirement, Compatible: m.Available, Reason: m.Reason, ReasonCode: m.ReasonCode, ComponentKind: m.ComponentKind, VersionSubject: m.VersionSubject, Launcher: m.Launcher, UpdateStatus: "not-checked", GuideURL: m.SourceURL}
+	if entry, ok := catalog.Lookup(m.ID); ok {
+		// Static adapter semantics are authoritative, including during execution
+		// revalidation of a plan supplied by a caller.
+		h.ComponentKind, h.VersionSubject, h.Launcher = entry.ComponentKind, entry.VersionSubject, entry.Launcher
+		if h.GuideURL == "" {
+			h.GuideURL = entry.SourceURL
+		}
+	}
 	if h.Reason == "" {
 		h.Reason = m.Status
 	}
@@ -324,13 +341,24 @@ func (e *Engine) observe(ctx context.Context, m domain.Manager) observation {
 		o.Health.Recommendation = "Install or repair this manager before checking updates."
 		return o
 	}
+	o.Binding = []string{healthFingerprintRevision, domain.MPMVersion, m.ID, identity(m.Path), m.Requirement, e.getenv("PATH"), e.Dir, e.RegistryURL, e.ReleasesURL, h.ComponentKind, h.VersionSubject, h.Launcher}
+	if hostedComponent(h) {
+		o.Health.Owner = "component installation; owner unverified"
+		o.Health.UpdateStatus = "guidance"
+		if h.VersionSubject == "launcher" {
+			o.Health.Recommendation = "This adapter reports the " + h.Launcher + " host version, not a plugin version. Inspect the host and its package/plugin configuration separately; no host update is inferred from this adapter."
+		} else {
+			o.Health.Recommendation = "Inspect this component's source or plugin configuration in the selected " + h.Launcher + " context. The launcher is not the component's update target; use the component's verified installation method."
+		}
+		e.fingerprint(&o)
+		return o
+	}
 	name := executableName(m.ID)
 	for _, p := range e.paths(name) {
 		if canonical(p) != canonical(m.Path) {
 			o.Health.Alternatives = append(o.Health.Alternatives, p)
 		}
 	}
-	o.Binding = []string{m.ID, identity(m.Path), m.Requirement, e.getenv("PATH"), e.Dir, e.RegistryURL, e.ReleasesURL}
 	if name == "npm" {
 		e.observeNPM(ctx, &o)
 	} else if name == "brew" {
@@ -368,26 +396,36 @@ func (e *Engine) observe(ctx context.Context, m domain.Manager) observation {
 			o.Health.Recommendation = "The selected executable's update owner could not be verified. Use its original installation method; later PATH alternatives will not be substituted."
 		}
 	}
-	if v, ok := version(o.Health.Version); ok && o.Health.Requirement != "" {
+	if v, ok := version(o.Health.Version); ok && o.Health.Requirement != "" && (m.Available || m.ReasonCode == "" || m.ReasonCode == "version_unsupported") {
 		o.Health.Compatible = minimum(v, o.Health.Requirement)
 		if !o.Health.Compatible {
+			o.Health.ReasonCode = "version_unsupported"
 			o.Health.Reason = "Selected version " + o.Health.Version + " does not satisfy backend requirement " + o.Health.Requirement
 		}
 	}
-	o.Binding = append(o.Binding, o.Health.Version, o.Health.Owner, o.Health.OwnerPath, o.Health.OwnerPackage, o.Health.RuntimePath, o.Health.RuntimeVersion, o.Health.Prefix, o.Health.ConfigPath, o.Health.Strategy)
-	sort.Strings(o.Binding)
-	o.Health.Fingerprint = hash(o.Binding)
+	e.fingerprint(&o)
 	return o
 }
 
+func (e *Engine) fingerprint(o *observation) {
+	o.Binding = append(o.Binding, o.Health.Version, o.Health.ReasonCode, o.Health.Reason, o.Health.Owner, o.Health.OwnerPath, o.Health.OwnerPackage, o.Health.RuntimePath, o.Health.RuntimeVersion, o.Health.Prefix, o.Health.ConfigPath, o.Health.Strategy)
+	sort.Strings(o.Binding)
+	o.Health.Fingerprint = hash(o.Binding)
+}
+
 func executableName(id string) string {
-	switch id {
-	case "uvx", "uv-pip":
-		return "uv"
-	case "cask":
-		return "brew"
+	if entry, ok := catalog.Lookup(id); ok && entry.Launcher != "" {
+		return entry.Launcher
 	}
 	return id
+}
+
+func hostedComponent(h domain.ManagerHealth) bool {
+	kind, subject := h.ComponentKind, h.VersionSubject
+	if entry, ok := catalog.Lookup(h.Manager); ok {
+		kind, subject = entry.ComponentKind, entry.VersionSubject
+	}
+	return kind == "shell" || kind == "hosted" || subject == "launcher"
 }
 
 func (e *Engine) updates(ctx context.Context, o *observation) error {

@@ -65,6 +65,21 @@ func (m *Model) layout() screenLayout {
 				addContent("provider", choices[i].id, rectangle{1, 5 + i - start, m.width - 2, 1})
 			}
 		}
+		if (m.modal == resolutionModal || m.modal == maintenanceModal) && !m.workflow.loading && m.workflow.err == nil {
+			start, count := m.workflowWindow()
+			for i := start; i < min(len(m.workflowRows()), start+count); i++ {
+				id := ""
+				if m.modal == resolutionModal {
+					id = m.workflow.assessment.Installations[i].ID
+				} else {
+					id = m.workflow.queue.Jobs[i].ID
+				}
+				addContent("workflow", id, rectangle{1, 5 + i - start, m.width - 2, 1})
+			}
+		}
+		if m.modal == exportPromptModal {
+			addContent("input", "", rectangle{1, 5, m.width - 2, 1})
+		}
 		if m.modal == saveSetModal {
 			addContent("input", "", rectangle{1, 5, m.width - 2, 1})
 			if !m.providerPicker.saving {
@@ -186,7 +201,14 @@ func (m *Model) footerButtons() ([]uiButton, []uiButton) {
 		}
 		first = append(first, uiButton{"b", label})
 	}
-	return first, []uiButton{{"f", "f providers"}, {"s", "s setup"}, {"r", "r refresh"}, {"?", "? help"}, {"M", "M mouse"}, {"q", "q quit"}}
+	extra := []uiButton{}
+	if m.view == managersView {
+		extra = append(extra, uiButton{"U", "U maintain"}, uiButton{"p", "p prompt"})
+	} else if m.commandTarget() != "" {
+		extra = append(extra, uiButton{"R", "R resolve"}, uiButton{"p", "p prompt"})
+	}
+	second := append(extra, []uiButton{{"f", "f providers"}, {"s", "s setup"}, {"r", "r refresh"}, {"?", "? help"}, {"M", "M mouse"}, {"q", "q quit"}}...)
+	return first, second
 }
 func (m *Model) modalButtons() []uiButton {
 	switch m.modal {
@@ -199,10 +221,53 @@ func (m *Model) modalButtons() []uiButton {
 			return nil
 		}
 		return []uiButton{{"enter", "Save set"}, {"esc", "Back"}}
+	case resolutionModal:
+		buttons := []uiButton{{"esc", "Stop"}}
+		if !m.workflow.loading && m.workflow.err == nil {
+			if item, ok := m.conflictItem(); ok {
+				buttons = append(buttons, uiButton{"K", "K keep"})
+				if m.workflow.keepID == "" {
+					buttons = append(buttons, uiButton{"enter", "Enter keep"})
+				} else if item.ID != m.workflow.keepID && item.Status == "ready" && len(item.Blockers) == 0 {
+					buttons = append(buttons, uiButton{"enter", "Enter review"})
+				}
+			}
+			buttons = append(buttons, uiButton{"p", "p prompt"}, uiButton{"r", "r recheck"})
+		}
+		return buttons
+	case maintenanceModal:
+		buttons := []uiButton{{"esc", "Stop"}}
+		if !m.workflow.loading && m.workflow.err == nil {
+			if job, ok := m.queueJob(); ok {
+				if job.ApplySupported {
+					buttons = append(buttons, uiButton{"enter", "Enter review"})
+				}
+				buttons = append(buttons, uiButton{"s", "s skip"}, uiButton{"p", "p prompt"})
+			}
+			buttons = append(buttons, uiButton{"r", "r recheck"})
+		}
+		return buttons
+	case promptModal:
+		buttons := []uiButton{{"esc", "Back"}}
+		if !m.workflow.loading && m.workflow.err == nil && !m.workflow.ioBusy {
+			buttons = append(buttons, uiButton{"c", "c copy"}, uiButton{"e", "e export"})
+		}
+		return buttons
+	case exportPromptModal:
+		if m.workflow.ioBusy {
+			return nil
+		}
+		return []uiButton{{"enter", "Export"}, {"esc", "Back"}}
 	case planModal:
 		buttons := []uiButton{{"esc", "Cancel"}}
 		if !m.planLoading && m.planErr == nil && m.planExecutable() && m.width >= 40 && m.height >= 10 {
 			buttons = append(buttons, uiButton{"y", "y Execute"})
+		}
+		if m.planReturn == maintenanceModal {
+			buttons = append(buttons, uiButton{"s", "s skip"}, uiButton{"q", "q stop"})
+		}
+		if m.planReturn == maintenanceModal || m.planReturn == resolutionModal {
+			buttons = append(buttons, uiButton{"p", "p prompt"})
 		}
 		return buttons
 	case versionModal:
@@ -269,6 +334,13 @@ func (m *Model) mouseMessage(message tea.Msg) tea.Cmd {
 			switch m.modal {
 			case providersModal:
 				m.providerPicker.position = clamp(m.providerPicker.position+delta, 0, len(m.providerChoices())-1)
+			case resolutionModal, maintenanceModal:
+				if !m.workflow.loading {
+					m.workflow.position = clamp(m.workflow.position+delta, 0, len(m.workflowRows())-1)
+					if m.modal == resolutionModal {
+						m.selectConflictPosition()
+					}
+				}
 			case setupModal:
 				m.setup.position = clamp(m.setup.position+delta, 0, len(m.setup.options)-1)
 			default:
@@ -313,6 +385,23 @@ func (m *Model) activateHit(target hitTarget) tea.Cmd {
 			}
 		}
 		return m.applyManagerFilter()
+	case "workflow":
+		if m.modal == resolutionModal {
+			for i, item := range m.workflow.assessment.Installations {
+				if item.ID == target.value {
+					m.workflow.position = i
+					m.selectConflictPosition()
+					break
+				}
+			}
+		} else {
+			for i, job := range m.workflow.queue.Jobs {
+				if job.ID == target.value {
+					m.workflow.position = i
+					break
+				}
+			}
+		}
 	case "provider":
 		m.selectProviderChoice(target.value)
 		m.toggleProvider()

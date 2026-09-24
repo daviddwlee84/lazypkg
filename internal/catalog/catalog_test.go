@@ -86,6 +86,23 @@ func TestGroupsAndDetachedMetadata(t *testing.T) {
 	}
 }
 
+func TestComponentMetadata(t *testing.T) {
+	for _, tc := range []struct{ id, kind, subject, launcher string }{
+		{"fisher", "shell", "component", "fish"},
+		{"zim", "shell", "component", "zsh"},
+		{"lazy", "hosted", "component", "nvim"},
+		{"mason", "hosted", "component", "nvim"},
+		{"vim-pack", "hosted", "launcher", "nvim"},
+		{"emacs", "hosted", "launcher", "emacs"},
+		{"yazi", "executable", "component", "ya"},
+	} {
+		e, ok := Lookup(tc.id)
+		if !ok || e.ComponentKind != tc.kind || e.VersionSubject != tc.subject || e.Launcher != tc.launcher {
+			t.Fatalf("%s: %+v", tc.id, e)
+		}
+	}
+}
+
 // Set LAZYPKG_CATALOG_PYTHON to the interpreter provisioned from the checked-in
 // requirements to run the generator parity check. Runtime tests need no Python.
 func TestGeneratorParity(t *testing.T) {

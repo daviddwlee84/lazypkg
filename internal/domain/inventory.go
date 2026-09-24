@@ -31,6 +31,10 @@ func CloneSnapshot(s Snapshot) Snapshot {
 		p.Evidence = append([]Evidence(nil), p.Evidence...)
 		p.InstalledVersions = append([]string(nil), p.InstalledVersions...)
 		p.PathMatches = append([]Executable(nil), p.PathMatches...)
+		for j := range p.PathMatches {
+			p.PathMatches[j].Chain = append([]string(nil), p.PathMatches[j].Chain...)
+			p.PathMatches[j].Evidence = append([]Evidence(nil), p.PathMatches[j].Evidence...)
+		}
 	}
 	return s
 }

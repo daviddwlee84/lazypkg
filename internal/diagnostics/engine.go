@@ -138,10 +138,19 @@ func (e *Engine) Diagnose(ctx context.Context, name string, packages []domain.Pa
 		indices := groups[key]
 		valid := []int{}
 		onPath := []int{}
+		winner := false
 		for _, i := range indices {
 			item := &items[i]
 			if item.Problem != "" {
 				report.Findings = append(report.Findings, domain.Finding{Kind: "broken", Name: item.Name, Message: item.Problem, Paths: []string{item.Path}})
+				continue
+			}
+			if !winner && item.PathIndex >= 0 {
+				item.Preferred = true
+				winner = true
+			}
+			if unresolvedDispatcher(*item) {
+				report.Findings = append(report.Findings, domain.Finding{Kind: "dispatcher", Name: item.Name, Message: "Runtime dispatcher; inspect this command to resolve its current target before assessing duplicate installations.", Paths: []string{item.Path}})
 				continue
 			}
 			for _, j := range valid {
@@ -154,9 +163,6 @@ func (e *Engine) Diagnose(ctx context.Context, name string, packages []domain.Pa
 					}
 					break
 				}
-			}
-			if len(onPath) == 0 && item.PathIndex >= 0 {
-				item.Preferred = true
 			}
 			if item.EquivalentTo == "" {
 				valid = append(valid, i)
@@ -196,8 +202,9 @@ func (e *Engine) attribute(item *domain.Executable, packages []domain.Package) {
 	if target == "" {
 		target = item.Path
 	}
-	for _, p := range packages {
-		matched := false
+	best, score := -1, 0
+	for index, p := range packages {
+		matched := 0
 		for _, path := range p.ExecutablePaths {
 			// Avoid statting every installed file for every PATH candidate. All
 			// supported managers record the public entrypoint or its real target.
@@ -206,13 +213,18 @@ func (e *Engine) attribute(item *domain.Executable, packages []domain.Package) {
 				continue
 			}
 			if samePath(item.Path, path) || samePath(target, path) {
-				matched = true
+				matched = 4
+				// Runtime bin scans include globals installed inside the runtime.
+				// A package manager's precise entrypoint registration wins that tie.
+				if p.Manager == "mise" {
+					matched = 2
+				}
 				break
 			}
 		}
 		// A recorded runtime/keg root is a manager installation, unlike generic
 		// directories such as ~/.local/bin or /usr/bin.
-		if !matched && (p.Manager == "mise" || p.Manager == "brew") && p.Root != "" {
+		if matched == 0 && (p.Manager == "mise" || p.Manager == "brew") && p.Root != "" {
 			root := p.Root
 			if p.Manager == "mise" {
 				if resolved, ok := miseOwnedRoot(root); ok {
@@ -223,11 +235,16 @@ func (e *Engine) attribute(item *domain.Executable, packages []domain.Package) {
 			} else if resolved, err := filepath.EvalSymlinks(root); err == nil {
 				root = resolved
 			}
-			matched = within(target, root)
+			if within(target, root) {
+				matched = 1
+			}
 		}
-		if !matched {
-			continue
+		if matched > score {
+			best, score = index, matched
 		}
+	}
+	if best >= 0 {
+		p := packages[best]
 		item.PackageKey = p.Key()
 		item.Manager = p.Manager
 		if e.GOOS == "windows" && p.Manager == "npm" {
@@ -319,8 +336,18 @@ func (e *Engine) miseShims(ctx context.Context, name string, items []domain.Exec
 		items[i].Target = target
 		items[i].Chain = append([]string{items[i].Path}, chain...)
 		items[i].Problem = problem
+		items[i].Evidence = append(items[i].Evidence, domain.Evidence{Kind: "recorded", Source: "mise which", Detail: "Dispatcher target resolved for the current directory without enabling automatic installation"})
 	}
 	return ctx.Err()
+}
+
+func unresolvedDispatcher(item domain.Executable) bool {
+	shim, resolved := false, false
+	for _, ev := range item.Evidence {
+		shim = shim || ev.Source == "mise shim directory"
+		resolved = resolved || ev.Source == "mise which"
+	}
+	return shim && !resolved
 }
 
 func samePath(a, b string) bool {

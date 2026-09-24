@@ -13,11 +13,13 @@
       "cli_names": [
         "am"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "am",
       "keywords": [],
+      "launcher": "am",
       "maintained": true,
       "maintenance": "",
       "name": "AppImage Manager",
@@ -78,7 +80,8 @@
       "reason": "mpm 8.0.1 requires >=10.4.",
       "requirement": ">=10.4",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/am.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/am.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "antidote",
@@ -92,11 +95,13 @@
       "cli_names": [
         "zsh"
       ],
+      "component_kind": "shell",
       "groups": [
         "unknown"
       ],
       "id": "antidote",
       "keywords": [],
+      "launcher": "zsh",
       "maintained": true,
       "maintenance": "",
       "name": "Antidote",
@@ -158,7 +163,8 @@
       "reason": "mpm 8.0.1 requires >=2.2.0.",
       "requirement": ">=2.2.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/antidote.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/antidote.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "antigen",
@@ -170,11 +176,13 @@
       "cli_names": [
         "zsh"
       ],
+      "component_kind": "shell",
       "groups": [
         "unknown"
       ],
       "id": "antigen",
       "keywords": [],
+      "launcher": "zsh",
       "maintained": true,
       "maintenance": "",
       "name": "Zsh Antigen",
@@ -236,7 +244,8 @@
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/antigen.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/antigen.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "apk",
@@ -254,6 +263,7 @@
       "cli_names": [
         "apk"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -262,6 +272,7 @@
         "alpine",
         "alpine linux"
       ],
+      "launcher": "apk",
       "maintained": true,
       "maintenance": "",
       "name": "Alpine apk",
@@ -322,7 +333,8 @@
       "reason": "mpm 8.0.1 requires >=2.10.0.",
       "requirement": ">=2.10.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/apk.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/apk.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "apm",
@@ -339,6 +351,7 @@
       "cli_names": [
         "apm"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -346,6 +359,7 @@
       "keywords": [
         "atom"
       ],
+      "launcher": "apm",
       "maintained": false,
       "maintenance": "Atom was [sunset on 2022-12-15](https://github.blog/2022-06-08-sunsetting-atom/); `apm` is archived and no community fork (such as [atom-community/apm](https://github.com/atom-community/apm)) has produced a usable drop-in.",
       "name": "Atom apm",
@@ -414,7 +428,8 @@
       "reason": "mpm 8.0.1 requires >=1.0.0.",
       "requirement": ">=1.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/apm.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/apm.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "apt",
@@ -434,6 +449,7 @@
       "cli_names": [
         "apt"
       ],
+      "component_kind": "executable",
       "groups": [
         "debian",
         "global",
@@ -445,6 +461,7 @@
         "dpkg",
         "ubuntu"
       ],
+      "launcher": "apt",
       "maintained": true,
       "maintenance": "",
       "name": "Debian apt",
@@ -518,7 +535,8 @@
       "reason": "mpm 8.0.1 requires >=1.0.0.",
       "requirement": ">=1.0.0",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/apt.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/apt.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "apt-cyg",
@@ -532,6 +550,7 @@
       "cli_names": [
         "apt-cyg"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -539,6 +558,7 @@
       "keywords": [
         "cygwin"
       ],
+      "launcher": "apt-cyg",
       "maintained": false,
       "maintenance": "The author [stopped maintaining apt-cyg in 2017](https://github.com/transcode-open/apt-cyg/blob/master/status.md), stating 'I am no longer working on apt-cyg' and directing users to fork it instead.",
       "name": "apt-cyg",
@@ -548,7 +568,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/apt_cyg.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/apt_cyg.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "apt-mint",
@@ -568,6 +589,7 @@
       "cli_names": [
         "apt"
       ],
+      "component_kind": "executable",
       "groups": [
         "debian",
         "unknown"
@@ -578,6 +600,7 @@
         "dpkg",
         "ubuntu"
       ],
+      "launcher": "apt",
       "maintained": true,
       "maintenance": "",
       "name": "Linux Mint apt",
@@ -651,7 +674,8 @@
       "reason": "mpm 8.0.1 requires >=1.0.0.",
       "requirement": ">=1.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/apt.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/apt.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "aptitude",
@@ -670,12 +694,14 @@
       "cli_names": [
         "aptitude"
       ],
+      "component_kind": "executable",
       "groups": [
         "debian",
         "unknown"
       ],
       "id": "aptitude",
       "keywords": [],
+      "launcher": "aptitude",
       "maintained": true,
       "maintenance": "",
       "name": "aptitude",
@@ -749,7 +775,8 @@
       "reason": "mpm 8.0.1 requires >=0.4.11.4.",
       "requirement": ">=0.4.11.4",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/aptitude.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/aptitude.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "asdf",
@@ -766,6 +793,7 @@
       "cli_names": [
         "asdf"
       ],
+      "component_kind": "executable",
       "groups": [
         "runtimes",
         "unknown"
@@ -774,6 +802,7 @@
       "keywords": [
         "asdf-vm"
       ],
+      "launcher": "asdf",
       "maintained": true,
       "maintenance": "",
       "name": "asdf",
@@ -835,7 +864,8 @@
       "reason": "mpm 8.0.1 requires >=0.16.0.",
       "requirement": ">=0.16.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/asdf.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/asdf.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "aura",
@@ -855,6 +885,7 @@
       "cli_names": [
         "aura"
       ],
+      "component_kind": "executable",
       "groups": [
         "arch",
         "unknown"
@@ -863,6 +894,7 @@
       "keywords": [
         "arch"
       ],
+      "launcher": "aura",
       "maintained": true,
       "maintenance": "",
       "name": "Arch Linux aura",
@@ -936,7 +968,8 @@
       "reason": "mpm 8.0.1 requires >=4.0.0.",
       "requirement": ">=4.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "basalt",
@@ -948,11 +981,13 @@
       "cli_names": [
         "basalt"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "basalt",
       "keywords": [],
+      "launcher": "basalt",
       "maintained": true,
       "maintenance": "",
       "name": "Basalt",
@@ -1014,7 +1049,8 @@
       "reason": "mpm 8.0.1 requires >=0.10.0.",
       "requirement": ">=0.10.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/basalt.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/basalt.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "bin",
@@ -1028,11 +1064,13 @@
       "cli_names": [
         "bin"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "bin",
       "keywords": [],
+      "launcher": "bin",
       "maintained": true,
       "maintenance": "",
       "name": "bin",
@@ -1095,7 +1133,8 @@
       "reason": "mpm 8.0.1 requires >=0.27.0.",
       "requirement": ">=0.27.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/bin.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/bin.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "bob",
@@ -1110,11 +1149,13 @@
       "cli_names": [
         "bob"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "bob",
       "keywords": [],
+      "launcher": "bob",
       "maintained": true,
       "maintenance": "",
       "name": "bob",
@@ -1177,7 +1218,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/bob.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/bob.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "bpkg",
@@ -1187,11 +1229,13 @@
       "cli_names": [
         "bpkg"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "bpkg",
       "keywords": [],
+      "launcher": "bpkg",
       "maintained": true,
       "maintenance": "",
       "name": "bpkg",
@@ -1253,7 +1297,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/bpkg.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/bpkg.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "brew",
@@ -1273,6 +1318,7 @@
       "cli_names": [
         "brew"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "system"
@@ -1281,6 +1327,7 @@
       "keywords": [
         "homebrew"
       ],
+      "launcher": "brew",
       "maintained": true,
       "maintenance": "",
       "name": "Homebrew Formulae",
@@ -1342,7 +1389,8 @@
       "reason": "mpm 8.0.1 requires >=6.0.0.",
       "requirement": ">=6.0.0",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/homebrew.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/homebrew.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "bun",
@@ -1357,12 +1405,14 @@
       "cli_names": [
         "bun"
       ],
+      "component_kind": "executable",
       "groups": [
         "node",
         "unknown"
       ],
       "id": "bun",
       "keywords": [],
+      "launcher": "bun",
       "maintained": true,
       "maintenance": "",
       "name": "Bun",
@@ -1425,7 +1475,8 @@
       "reason": "mpm 8.0.1 requires >=1.2.0.",
       "requirement": ">=1.2.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/bun.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/bun.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "cargo",
@@ -1438,6 +1489,7 @@
       "cli_names": [
         "cargo"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "rust"
@@ -1447,6 +1499,7 @@
         "crate",
         "rust"
       ],
+      "launcher": "cargo",
       "maintained": true,
       "maintenance": "",
       "name": "Rust cargo",
@@ -1522,7 +1575,8 @@
       "reason": "mpm 8.0.1 requires >=1.0.0.",
       "requirement": ">=1.0.0",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/cargo.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/cargo.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "cask",
@@ -1541,12 +1595,14 @@
       "cli_names": [
         "brew"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "system"
       ],
       "id": "cask",
       "keywords": [],
+      "launcher": "brew",
       "maintained": true,
       "maintenance": "",
       "name": "Homebrew Cask",
@@ -1556,7 +1612,8 @@
       "reason": "mpm 8.0.1 requires >=6.0.0.",
       "requirement": ">=6.0.0",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/homebrew.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/homebrew.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "cave",
@@ -1573,6 +1630,7 @@
       "cli_names": [
         "cave"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -1581,6 +1639,7 @@
         "exherbo",
         "paludis"
       ],
+      "launcher": "cave",
       "maintained": true,
       "maintenance": "[Paludis / cave](https://exherbo.org) is slow-moving: its last release (`3.0.2`) and commits date to around March 2025, though the project is not archived and carries no retirement notice.",
       "name": "cave",
@@ -1590,7 +1649,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/cave.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/cave.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "choco",
@@ -1606,6 +1666,7 @@
       "cli_names": [
         "choco"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "system"
@@ -1614,6 +1675,7 @@
       "keywords": [
         "chocolatey"
       ],
+      "launcher": "choco",
       "maintained": true,
       "maintenance": "",
       "name": "Chocolatey",
@@ -1623,7 +1685,8 @@
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/choco.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/choco.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "choosenim",
@@ -1637,11 +1700,13 @@
       "cli_names": [
         "choosenim"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "choosenim",
       "keywords": [],
+      "launcher": "choosenim",
       "maintained": true,
       "maintenance": "",
       "name": "Nim choosenim",
@@ -1704,7 +1769,8 @@
       "reason": "mpm 8.0.1 requires >=0.8.4.",
       "requirement": ">=0.8.4",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/choosenim.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/choosenim.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "chromebrew",
@@ -1720,6 +1786,7 @@
       "cli_names": [
         "crew"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -1728,6 +1795,7 @@
         "chrome os",
         "chromeos"
       ],
+      "launcher": "crew",
       "maintained": true,
       "maintenance": "",
       "name": "Chromebrew",
@@ -1737,7 +1805,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/chromebrew.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/chromebrew.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "claude-code-plugins",
@@ -1752,11 +1821,13 @@
       "cli_names": [
         "claude"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "claude-code-plugins",
       "keywords": [],
+      "launcher": "claude",
       "maintained": true,
       "maintenance": "",
       "name": "Claude Code plugins",
@@ -1819,7 +1890,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/claude_code_plugins.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/claude_code_plugins.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "clib",
@@ -1831,11 +1903,13 @@
       "cli_names": [
         "clib"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "clib",
       "keywords": [],
+      "launcher": "clib",
       "maintained": true,
       "maintenance": "",
       "name": "clib",
@@ -1897,7 +1971,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/clib.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/clib.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "composer",
@@ -1915,6 +1990,7 @@
       "cli_names": [
         "composer"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -1922,6 +1998,7 @@
       "keywords": [
         "php"
       ],
+      "launcher": "composer",
       "maintained": true,
       "maintenance": "",
       "name": "PHP Composer",
@@ -1997,7 +2074,8 @@
       "reason": "mpm 8.0.1 requires >=1.4.0.",
       "requirement": ">=1.4.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/composer.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/composer.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "conda",
@@ -2014,6 +2092,7 @@
       "cli_names": [
         "conda"
       ],
+      "component_kind": "executable",
       "groups": [
         "environment"
       ],
@@ -2023,6 +2102,7 @@
         "conda-forge",
         "miniconda"
       ],
+      "launcher": "conda",
       "maintained": true,
       "maintenance": "",
       "name": "Conda",
@@ -2085,7 +2165,8 @@
       "reason": "mpm 8.0.1 requires >=4.6.0.",
       "requirement": ">=4.6.0",
       "scope": "environment",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/conda.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/conda.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "cpan",
@@ -2099,6 +2180,7 @@
       "cli_names": [
         "cpan"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -2106,6 +2188,7 @@
       "keywords": [
         "perl"
       ],
+      "launcher": "cpan",
       "maintained": true,
       "maintenance": "",
       "name": "Perl CPAN",
@@ -2181,7 +2264,8 @@
       "reason": "mpm 8.0.1 requires >=1.64.",
       "requirement": ">=1.64",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/cpan.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/cpan.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "deb-get",
@@ -2199,11 +2283,13 @@
       "cli_names": [
         "deb-get"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "deb-get",
       "keywords": [],
+      "launcher": "deb-get",
       "maintained": true,
       "maintenance": "",
       "name": "deb-get",
@@ -2264,7 +2350,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/deb_get.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/deb_get.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "dkp-pacman",
@@ -2284,6 +2371,7 @@
       "cli_names": [
         "dkp-pacman"
       ],
+      "component_kind": "executable",
       "groups": [
         "arch",
         "unknown"
@@ -2292,6 +2380,7 @@
       "keywords": [
         "arch"
       ],
+      "launcher": "dkp-pacman",
       "maintained": true,
       "maintenance": "",
       "name": "devkitPro pacman",
@@ -2353,7 +2442,8 @@
       "reason": "mpm 8.0.1 requires >=6.0.0.",
       "requirement": ">=6.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "dnf",
@@ -2374,6 +2464,7 @@
         "dnf",
         "dnf4"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "rpm",
@@ -2386,6 +2477,7 @@
         "rhel",
         "rpm"
       ],
+      "launcher": "dnf",
       "maintained": true,
       "maintenance": "DNF 4 is superseded by [dnf5](https://github.com/rpm-software-management/dnf5) (Fedora's default since Fedora 41) but stays maintained for the RHEL 8/9 family; mpm wraps `dnf5` as a separate manager.",
       "name": "Fedora DNF",
@@ -2459,7 +2551,8 @@
       "reason": "mpm 8.0.1 requires >=4.0.0,<5.",
       "requirement": ">=4.0.0,<5",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/dnf.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/dnf.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "dnf5",
@@ -2479,6 +2572,7 @@
       "cli_names": [
         "dnf5"
       ],
+      "component_kind": "executable",
       "groups": [
         "rpm",
         "unknown"
@@ -2490,6 +2584,7 @@
         "rhel",
         "rpm"
       ],
+      "launcher": "dnf5",
       "maintained": true,
       "maintenance": "",
       "name": "Fedora DNF5",
@@ -2563,7 +2658,8 @@
       "reason": "mpm 8.0.1 requires >=5.0.0.",
       "requirement": ">=5.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/dnf.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/dnf.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "dotnet",
@@ -2578,6 +2674,7 @@
       "cli_names": [
         "dotnet"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -2585,6 +2682,7 @@
       "keywords": [
         "nuget"
       ],
+      "launcher": "dotnet",
       "maintained": true,
       "maintenance": "",
       "name": "dotnet tool",
@@ -2647,7 +2745,8 @@
       "reason": "mpm 8.0.1 requires >=8.0.400.",
       "requirement": ">=8.0.400",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/dotnet.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/dotnet.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "elan",
@@ -2661,11 +2760,13 @@
       "cli_names": [
         "elan"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "elan",
       "keywords": [],
+      "launcher": "elan",
       "maintained": true,
       "maintenance": "",
       "name": "Lean elan",
@@ -2728,7 +2829,8 @@
       "reason": "mpm 8.0.1 requires >=4.0.0.",
       "requirement": ">=4.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/elan.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/elan.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "emacs",
@@ -2741,11 +2843,13 @@
       "cli_names": [
         "emacs"
       ],
+      "component_kind": "hosted",
       "groups": [
         "unknown"
       ],
       "id": "emacs",
       "keywords": [],
+      "launcher": "emacs",
       "maintained": true,
       "maintenance": "",
       "name": "GNU Emacs packages",
@@ -2808,7 +2912,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/emacs.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/emacs.toml",
+      "version_subject": "launcher"
     },
     {
       "backend_id": "emerge",
@@ -2827,6 +2932,7 @@
       "cli_names": [
         "emerge"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -2835,6 +2941,7 @@
         "gentoo",
         "portage"
       ],
+      "launcher": "emerge",
       "maintained": true,
       "maintenance": "",
       "name": "Gentoo emerge",
@@ -2908,7 +3015,8 @@
       "reason": "mpm 8.0.1 requires >=3.0.0.",
       "requirement": ">=3.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/emerge.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/emerge.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "eopkg",
@@ -2926,6 +3034,7 @@
       "cli_names": [
         "eopkg"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -2933,6 +3042,7 @@
       "keywords": [
         "solus"
       ],
+      "launcher": "eopkg",
       "maintained": true,
       "maintenance": "",
       "name": "Solus eopkg",
@@ -2993,7 +3103,8 @@
       "reason": "mpm 8.0.1 requires >=3.2.0.",
       "requirement": ">=3.2.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/eopkg.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/eopkg.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "fink",
@@ -3010,11 +3121,13 @@
       "cli_names": [
         "fink"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "fink",
       "keywords": [],
+      "launcher": "fink",
       "maintained": true,
       "maintenance": "[Fink](https://github.com/fink/fink) is in deep maintenance mode: no engine release since `0.45.6` (February 2022), though its package tree still receives occasional commits.",
       "name": "Fink",
@@ -3024,7 +3137,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/fink.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/fink.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "fisher",
@@ -3038,11 +3152,13 @@
       "cli_names": [
         "fish"
       ],
+      "component_kind": "shell",
       "groups": [
         "unknown"
       ],
       "id": "fisher",
       "keywords": [],
+      "launcher": "fish",
       "maintained": true,
       "maintenance": "",
       "name": "Fish fisher",
@@ -3104,7 +3220,8 @@
       "reason": "mpm 8.0.1 requires >=4.0.0.",
       "requirement": ">=4.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/fisher.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/fisher.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "flatpak",
@@ -3122,6 +3239,7 @@
       "cli_names": [
         "flatpak"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "system"
@@ -3130,6 +3248,7 @@
       "keywords": [
         "flathub"
       ],
+      "launcher": "flatpak",
       "maintained": true,
       "maintenance": "",
       "name": "Flatpak",
@@ -3203,7 +3322,8 @@
       "reason": "mpm 8.0.1 requires >=1.9.1.",
       "requirement": ">=1.9.1",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/flatpak.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/flatpak.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "fwupd",
@@ -3218,6 +3338,7 @@
       "cli_names": [
         "fwupdmgr"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -3225,6 +3346,7 @@
       "keywords": [
         "lvfs"
       ],
+      "launcher": "fwupdmgr",
       "maintained": true,
       "maintenance": "",
       "name": "Linux fwupd",
@@ -3285,7 +3407,8 @@
       "reason": "mpm 8.0.1 requires >=1.9.5.",
       "requirement": ">=1.9.5",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/fwupd.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/fwupd.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "gcloud",
@@ -3299,11 +3422,13 @@
       "cli_names": [
         "gcloud"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "gcloud",
       "keywords": [],
+      "launcher": "gcloud",
       "maintained": true,
       "maintenance": "",
       "name": "Google Cloud CLI",
@@ -3366,7 +3491,8 @@
       "reason": "mpm 8.0.1 requires >=170.0.0.",
       "requirement": ">=170.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/gcloud.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/gcloud.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "gem",
@@ -3385,6 +3511,7 @@
       "cli_names": [
         "gem"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "ruby"
@@ -3393,6 +3520,7 @@
       "keywords": [
         "ruby"
       ],
+      "launcher": "gem",
       "maintained": true,
       "maintenance": "",
       "name": "RubyGems",
@@ -3468,7 +3596,8 @@
       "reason": "mpm 8.0.1 requires >=2.5.0.",
       "requirement": ">=2.5.0",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/gem.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/gem.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "getnf",
@@ -3483,6 +3612,7 @@
       "cli_names": [
         "getnf"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -3491,6 +3621,7 @@
         "nerd font",
         "nerd fonts"
       ],
+      "launcher": "getnf",
       "maintained": true,
       "maintenance": "",
       "name": "getnf",
@@ -3552,7 +3683,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/getnf.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/getnf.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "gext",
@@ -3568,11 +3700,13 @@
       "cli_names": [
         "gext"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "gext",
       "keywords": [],
+      "launcher": "gext",
       "maintained": true,
       "maintenance": "",
       "name": "GNOME Shell extensions",
@@ -3646,7 +3780,8 @@
       "reason": "mpm 8.0.1 requires >=0.11.0.",
       "requirement": ">=0.11.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/gext.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/gext.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "gh-ext",
@@ -3661,6 +3796,7 @@
       "cli_names": [
         "gh"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -3669,6 +3805,7 @@
         "gh extension",
         "github cli"
       ],
+      "launcher": "gh",
       "maintained": true,
       "maintenance": "",
       "name": "GitHub CLI extensions",
@@ -3731,7 +3868,8 @@
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/gh_ext.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/gh_ext.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "ghcup",
@@ -3746,11 +3884,13 @@
       "cli_names": [
         "ghcup"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "ghcup",
       "keywords": [],
+      "launcher": "ghcup",
       "maintained": true,
       "maintenance": "",
       "name": "Haskell ghcup",
@@ -3813,7 +3953,8 @@
       "reason": "mpm 8.0.1 requires >=0.2.1.0.",
       "requirement": ">=0.2.1.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/ghcup.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/ghcup.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "go",
@@ -3824,12 +3965,14 @@
       "cli_names": [
         "go"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "go"
       ],
       "id": "go",
       "keywords": [],
+      "launcher": "go",
       "maintained": true,
       "maintenance": "",
       "name": "Go",
@@ -3905,7 +4048,8 @@
       "reason": "mpm 8.0.1 requires >=1.16.0.",
       "requirement": ">=1.16.0",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/go.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/go.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "guix",
@@ -3923,6 +4067,7 @@
       "cli_names": [
         "guix"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -3930,6 +4075,7 @@
       "keywords": [
         "gnu guix"
       ],
+      "launcher": "guix",
       "maintained": true,
       "maintenance": "",
       "name": "GNU Guix",
@@ -3990,7 +4136,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/guix.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/guix.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "gup",
@@ -4004,11 +4151,13 @@
       "cli_names": [
         "gup"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "gup",
       "keywords": [],
+      "launcher": "gup",
       "maintained": true,
       "maintenance": "",
       "name": "gup",
@@ -4071,7 +4220,8 @@
       "reason": "mpm 8.0.1 requires >=1.3.1.",
       "requirement": ">=1.3.1",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/gup.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/gup.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "haxelib",
@@ -4086,11 +4236,13 @@
       "cli_names": [
         "haxelib"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "haxelib",
       "keywords": [],
+      "launcher": "haxelib",
       "maintained": true,
       "maintenance": "",
       "name": "Haxe haxelib",
@@ -4166,7 +4318,8 @@
       "reason": "mpm 8.0.1 requires >=4.0.0.",
       "requirement": ">=4.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/haxelib.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/haxelib.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "hyprpm",
@@ -4179,6 +4332,7 @@
       "cli_names": [
         "hyprpm"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -4186,6 +4340,7 @@
       "keywords": [
         "hyprland"
       ],
+      "launcher": "hyprpm",
       "maintained": true,
       "maintenance": "",
       "name": "Hyprland hyprpm",
@@ -4246,7 +4401,8 @@
       "reason": "mpm 8.0.1 requires >=0.56.0.",
       "requirement": ">=0.56.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/hyprpm.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/hyprpm.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "ips",
@@ -4263,6 +4419,7 @@
       "cli_names": [
         "pkg"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -4270,6 +4427,7 @@
       "keywords": [
         "pkg5"
       ],
+      "launcher": "pkg",
       "maintained": true,
       "maintenance": "",
       "name": "Image Packaging System",
@@ -4280,7 +4438,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/ips.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/ips.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "jpm",
@@ -4294,11 +4453,13 @@
       "cli_names": [
         "jpm"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "jpm",
       "keywords": [],
+      "launcher": "jpm",
       "maintained": true,
       "maintenance": "",
       "name": "jpm",
@@ -4361,7 +4522,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/jpm.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/jpm.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "julia",
@@ -4377,11 +4539,13 @@
       "cli_names": [
         "julia"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "julia",
       "keywords": [],
+      "launcher": "julia",
       "maintained": true,
       "maintenance": "",
       "name": "Julia Pkg",
@@ -4444,7 +4608,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/julia.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/julia.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "juliaup",
@@ -4461,11 +4626,13 @@
       "cli_names": [
         "juliaup"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "juliaup",
       "keywords": [],
+      "launcher": "juliaup",
       "maintained": true,
       "maintenance": "",
       "name": "Julia juliaup",
@@ -4528,7 +4695,8 @@
       "reason": "mpm 8.0.1 requires >=1.21.0.",
       "requirement": ">=1.21.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/juliaup.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/juliaup.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "krew",
@@ -4545,11 +4713,13 @@
         "kubectl-krew",
         "krew"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "krew",
       "keywords": [],
+      "launcher": "kubectl-krew",
       "maintained": true,
       "maintenance": "",
       "name": "kubectl krew",
@@ -4625,7 +4795,8 @@
       "reason": "mpm 8.0.1 requires >=0.4.0.",
       "requirement": ">=0.4.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/krew.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/krew.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "lazy",
@@ -4636,11 +4807,13 @@
       "cli_names": [
         "nvim"
       ],
+      "component_kind": "hosted",
       "groups": [
         "unknown"
       ],
       "id": "lazy",
       "keywords": [],
+      "launcher": "nvim",
       "maintained": true,
       "maintenance": "",
       "name": "Neovim lazy-nvim",
@@ -4716,7 +4889,8 @@
       "reason": "mpm 8.0.1 requires >=11.0.0.",
       "requirement": ">=11.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/neovim.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/neovim.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "luarocks",
@@ -4732,11 +4906,13 @@
       "cli_names": [
         "luarocks"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "luarocks",
       "keywords": [],
+      "launcher": "luarocks",
       "maintained": true,
       "maintenance": "",
       "name": "LuaRocks",
@@ -4812,7 +4988,8 @@
       "reason": "mpm 8.0.1 requires >=3.9.1.",
       "requirement": ">=3.9.1",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/luarocks.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/luarocks.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "lure",
@@ -4825,11 +5002,13 @@
       "cli_names": [
         "lure"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "lure",
       "keywords": [],
+      "launcher": "lure",
       "maintained": true,
       "maintenance": "LURE's own forge at `git.elara.ws` answers `502` and `lure.sh` answers `404` behind a placeholder certificate, so its installer and release binaries are both unreachable and the tool has to be built from source. Its author announced a pause rather than an end in [lure-sh/lure#89](https://github.com/lure-sh/lure/issues/89) on 2025-05-04, *\"I intend to start working on it again as soon as I'm in a stable position again\"*, and the recipe repository this manager reads is on GitHub and still moving.",
       "name": "LURE",
@@ -4890,7 +5069,8 @@
       "reason": "mpm 8.0.1 requires >=0.1.3.",
       "requirement": ">=0.1.3",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/lure.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/lure.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "macports",
@@ -4909,11 +5089,13 @@
       "cli_names": [
         "port"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "macports",
       "keywords": [],
+      "launcher": "port",
       "maintained": true,
       "maintenance": "",
       "name": "MacPorts",
@@ -4923,7 +5105,8 @@
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/macports.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/macports.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "mamba",
@@ -4940,11 +5123,13 @@
       "cli_names": [
         "mamba"
       ],
+      "component_kind": "executable",
       "groups": [
         "environment"
       ],
       "id": "mamba",
       "keywords": [],
+      "launcher": "mamba",
       "maintained": true,
       "maintenance": "",
       "name": "Mamba",
@@ -5007,7 +5192,8 @@
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
       "scope": "environment",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/mamba.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/mamba.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "mas",
@@ -5023,6 +5209,7 @@
       "cli_names": [
         "mas"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -5031,6 +5218,7 @@
         "app store",
         "app-store"
       ],
+      "launcher": "mas",
       "maintained": true,
       "maintenance": "",
       "name": "Mac App Store",
@@ -5040,7 +5228,8 @@
       "reason": "mpm 8.0.1 requires >=7.0.0.",
       "requirement": ">=7.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/mas.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/mas.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "mason",
@@ -5054,11 +5243,13 @@
       "cli_names": [
         "nvim"
       ],
+      "component_kind": "hosted",
       "groups": [
         "unknown"
       ],
       "id": "mason",
       "keywords": [],
+      "launcher": "nvim",
       "maintained": true,
       "maintenance": "",
       "name": "Neovim mason-nvim",
@@ -5134,7 +5325,8 @@
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/neovim.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/neovim.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "micro",
@@ -5149,11 +5341,13 @@
       "cli_names": [
         "micro"
       ],
+      "component_kind": "hosted",
       "groups": [
         "unknown"
       ],
       "id": "micro",
       "keywords": [],
+      "launcher": "micro",
       "maintained": true,
       "maintenance": "",
       "name": "micro editor",
@@ -5229,7 +5423,8 @@
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/micro.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/micro.toml",
+      "version_subject": "launcher"
     },
     {
       "backend_id": "microdnf",
@@ -5247,12 +5442,14 @@
       "cli_names": [
         "microdnf"
       ],
+      "component_kind": "executable",
       "groups": [
         "rpm",
         "unknown"
       ],
       "id": "microdnf",
       "keywords": [],
+      "launcher": "microdnf",
       "maintained": true,
       "maintenance": "Superseded by [dnf5](https://github.com/rpm-software-management/dnf5) on Fedora, and on RHEL releases after 10. The C implementation stays maintained for RHEL 10 and older, whose minimal images ship it; mpm wraps `dnf5` as a separate manager.",
       "name": "microdnf",
@@ -5313,7 +5510,8 @@
       "reason": "mpm 8.0.1 requires >=3.8.0.",
       "requirement": ">=3.8.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/microdnf.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/microdnf.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "micromamba",
@@ -5330,11 +5528,13 @@
       "cli_names": [
         "micromamba"
       ],
+      "component_kind": "executable",
       "groups": [
         "environment"
       ],
       "id": "micromamba",
       "keywords": [],
+      "launcher": "micromamba",
       "maintained": true,
       "maintenance": "",
       "name": "Micromamba",
@@ -5397,7 +5597,8 @@
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
       "scope": "environment",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/mamba.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/mamba.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "miktex",
@@ -5412,11 +5613,13 @@
       "cli_names": [
         "miktex"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "miktex",
       "keywords": [],
+      "launcher": "miktex",
       "maintained": true,
       "maintenance": "",
       "name": "MiKTeX",
@@ -5478,7 +5681,8 @@
       "reason": "mpm 8.0.1 requires >=22.3.",
       "requirement": ">=22.3",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/miktex.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/miktex.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "mise",
@@ -5497,6 +5701,7 @@
       "cli_names": [
         "mise"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "runtimes"
@@ -5505,6 +5710,7 @@
       "keywords": [
         "mise-en-place"
       ],
+      "launcher": "mise",
       "maintained": true,
       "maintenance": "",
       "name": "mise",
@@ -5580,7 +5786,8 @@
       "reason": "mpm 8.0.1 requires >=2025.5.10.",
       "requirement": ">=2025.5.10",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/mise.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/mise.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "nala",
@@ -5598,12 +5805,14 @@
       "cli_names": [
         "nala"
       ],
+      "component_kind": "executable",
       "groups": [
         "debian",
         "unknown"
       ],
       "id": "nala",
       "keywords": [],
+      "launcher": "nala",
       "maintained": true,
       "maintenance": "",
       "name": "Nala",
@@ -5664,7 +5873,8 @@
       "reason": "mpm 8.0.1 requires >=0.12.2.",
       "requirement": ">=0.12.2",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/nala.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/nala.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "nimble",
@@ -5678,11 +5888,13 @@
       "cli_names": [
         "nimble"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "nimble",
       "keywords": [],
+      "launcher": "nimble",
       "maintained": true,
       "maintenance": "",
       "name": "Nimble",
@@ -5758,7 +5970,8 @@
       "reason": "mpm 8.0.1 requires >=0.22.0.",
       "requirement": ">=0.22.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/nimble.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/nimble.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "nix",
@@ -5776,6 +5989,7 @@
       "cli_names": [
         "nix-env"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -5784,6 +5998,7 @@
         "nixos",
         "nixpkgs"
       ],
+      "launcher": "nix-env",
       "maintained": true,
       "maintenance": "",
       "name": "Nix",
@@ -5845,7 +6060,8 @@
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/nix.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/nix.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "npm",
@@ -5863,6 +6079,7 @@
       "cli_names": [
         "npm"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "node"
@@ -5872,6 +6089,7 @@
         "node.js",
         "nodejs"
       ],
+      "launcher": "npm",
       "maintained": true,
       "maintenance": "",
       "name": "Node npm",
@@ -5947,7 +6165,8 @@
       "reason": "mpm 8.0.1 requires npm >=11.10.0 because that release introduced min-release-age; older npm silently ignores the release-age setting.",
       "requirement": ">=11.10.0",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/npm.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/npm.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "oh-my-fish",
@@ -5961,11 +6180,13 @@
       "cli_names": [
         "fish"
       ],
+      "component_kind": "shell",
       "groups": [
         "unknown"
       ],
       "id": "oh-my-fish",
       "keywords": [],
+      "launcher": "fish",
       "maintained": true,
       "maintenance": "",
       "name": "Fish Oh My Fish",
@@ -6027,7 +6248,8 @@
       "reason": "mpm 8.0.1 requires >=6.0.0.",
       "requirement": ">=6.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/oh_my_fish.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/oh_my_fish.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "ollama",
@@ -6040,11 +6262,13 @@
       "cli_names": [
         "ollama"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "ollama",
       "keywords": [],
+      "launcher": "ollama",
       "maintained": true,
       "maintenance": "",
       "name": "Ollama",
@@ -6107,7 +6331,8 @@
       "reason": "mpm 8.0.1 requires >=0.5.0.",
       "requirement": ">=0.5.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/ollama.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/ollama.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "opam",
@@ -6123,11 +6348,13 @@
       "cli_names": [
         "opam"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "opam",
       "keywords": [],
+      "launcher": "opam",
       "maintained": true,
       "maintenance": "",
       "name": "OCaml opam",
@@ -6195,7 +6422,8 @@
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/opam.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/opam.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "opkg",
@@ -6212,11 +6440,13 @@
       "cli_names": [
         "opkg"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "opkg",
       "keywords": [],
+      "launcher": "opkg",
       "maintained": true,
       "maintenance": "",
       "name": "opkg",
@@ -6290,7 +6520,8 @@
       "reason": "mpm 8.0.1 requires >=0.2.0.",
       "requirement": ">=0.2.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/opkg.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/opkg.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "pacaur",
@@ -6310,6 +6541,7 @@
       "cli_names": [
         "pacaur"
       ],
+      "component_kind": "executable",
       "groups": [
         "arch",
         "unknown"
@@ -6318,6 +6550,7 @@
       "keywords": [
         "arch"
       ],
+      "launcher": "pacaur",
       "maintained": false,
       "maintenance": "The [original pacaur repository is archived](https://github.com/rmarquis/pacaur) (last commit 2018) and the [E5ten fork](https://github.com/E5ten/pacaur) has had no commits since 2021; migrate to `paru` or `yay`.",
       "name": "Arch Linux pacaur",
@@ -6391,7 +6624,8 @@
       "reason": "mpm 8.0.1 requires >=4.0.0.",
       "requirement": ">=4.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pacman",
@@ -6411,6 +6645,7 @@
       "cli_names": [
         "pacman"
       ],
+      "component_kind": "executable",
       "groups": [
         "arch",
         "global",
@@ -6420,6 +6655,7 @@
       "keywords": [
         "arch"
       ],
+      "launcher": "pacman",
       "maintained": true,
       "maintenance": "",
       "name": "Arch Linux pacman",
@@ -6493,7 +6729,8 @@
       "reason": "mpm 8.0.1 requires >=5.0.0.",
       "requirement": ">=5.0.0",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pacstall",
@@ -6510,11 +6747,13 @@
       "cli_names": [
         "pacstall"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "pacstall",
       "keywords": [],
+      "launcher": "pacstall",
       "maintained": true,
       "maintenance": "",
       "name": "Pacstall",
@@ -6575,7 +6814,8 @@
       "reason": "mpm 8.0.1 requires >=6.0.0.",
       "requirement": ">=6.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacstall.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacstall.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pamac",
@@ -6593,12 +6833,14 @@
       "cli_names": [
         "pamac"
       ],
+      "component_kind": "executable",
       "groups": [
         "arch",
         "unknown"
       ],
       "id": "pamac",
       "keywords": [],
+      "launcher": "pamac",
       "maintained": true,
       "maintenance": "",
       "name": "Manjaro pamac",
@@ -6659,7 +6901,8 @@
       "reason": "mpm 8.0.1 requires >=11.0.0.",
       "requirement": ">=11.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pamac.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pamac.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "paru",
@@ -6679,6 +6922,7 @@
       "cli_names": [
         "paru"
       ],
+      "component_kind": "executable",
       "groups": [
         "arch",
         "unknown"
@@ -6687,6 +6931,7 @@
       "keywords": [
         "arch"
       ],
+      "launcher": "paru",
       "maintained": true,
       "maintenance": "",
       "name": "Arch Linux paru",
@@ -6760,7 +7005,8 @@
       "reason": "mpm 8.0.1 requires >=1.9.3.",
       "requirement": ">=1.9.3",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pear",
@@ -6777,11 +7023,13 @@
       "cli_names": [
         "pear"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "pear",
       "keywords": [],
+      "launcher": "pear",
       "maintained": true,
       "maintenance": "",
       "name": "PEAR",
@@ -6857,7 +7105,8 @@
       "reason": "mpm 8.0.1 requires >=1.10.0.",
       "requirement": ">=1.10.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pear.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pear.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pearl",
@@ -6871,11 +7120,13 @@
       "cli_names": [
         "pearl"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "pearl",
       "keywords": [],
+      "launcher": "pearl",
       "maintained": true,
       "maintenance": "",
       "name": "Pearl",
@@ -6937,7 +7188,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pearl.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pearl.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "pi",
@@ -6951,11 +7203,13 @@
       "cli_names": [
         "pi"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "pi",
       "keywords": [],
+      "launcher": "pi",
       "maintained": true,
       "maintenance": "",
       "name": "Pi extensions",
@@ -7018,7 +7272,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pi.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pi.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "pikaur",
@@ -7038,6 +7293,7 @@
       "cli_names": [
         "pikaur"
       ],
+      "component_kind": "executable",
       "groups": [
         "arch",
         "unknown"
@@ -7046,6 +7302,7 @@
       "keywords": [
         "arch"
       ],
+      "launcher": "pikaur",
       "maintained": true,
       "maintenance": "",
       "name": "Arch Linux pikaur",
@@ -7119,7 +7376,8 @@
       "reason": "mpm 8.0.1 requires >=1.0.0.",
       "requirement": ">=1.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pip",
@@ -7137,6 +7395,7 @@
         "python3",
         "python"
       ],
+      "component_kind": "executable",
       "groups": [
         "environment",
         "python"
@@ -7145,6 +7404,7 @@
       "keywords": [
         "pypi"
       ],
+      "launcher": "python3",
       "maintained": true,
       "maintenance": "",
       "name": "Python pip",
@@ -7220,7 +7480,8 @@
       "reason": "mpm 8.0.1 requires >=26.1.0.",
       "requirement": ">=26.1.0",
       "scope": "environment",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pip.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pip.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pipx",
@@ -7235,12 +7496,14 @@
       "cli_names": [
         "pipx"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "python"
       ],
       "id": "pipx",
       "keywords": [],
+      "launcher": "pipx",
       "maintained": true,
       "maintenance": "",
       "name": "Python pipx",
@@ -7316,7 +7579,8 @@
       "reason": "mpm 8.0.1 requires >=1.0.0.",
       "requirement": ">=1.0.0",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pipx.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pipx.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pipxu",
@@ -7330,12 +7594,14 @@
       "cli_names": [
         "pipxu"
       ],
+      "component_kind": "executable",
       "groups": [
         "environment",
         "python"
       ],
       "id": "pipxu",
       "keywords": [],
+      "launcher": "pipxu",
       "maintained": true,
       "maintenance": "",
       "name": "pipxu",
@@ -7397,7 +7663,8 @@
       "reason": "",
       "requirement": "",
       "scope": "environment",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pipxu.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pipxu.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "pixi",
@@ -7412,6 +7679,7 @@
       "cli_names": [
         "pixi"
       ],
+      "component_kind": "executable",
       "groups": [
         "environment"
       ],
@@ -7419,6 +7687,7 @@
       "keywords": [
         "prefix.dev"
       ],
+      "launcher": "pixi",
       "maintained": true,
       "maintenance": "",
       "name": "pixi",
@@ -7481,7 +7750,8 @@
       "reason": "mpm 8.0.1 requires >=0.65.0.",
       "requirement": ">=0.65.0",
       "scope": "environment",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pixi.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pixi.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pkcon",
@@ -7498,6 +7768,7 @@
       "cli_names": [
         "pkcon"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -7505,6 +7776,7 @@
       "keywords": [
         "packagekit"
       ],
+      "launcher": "pkcon",
       "maintained": true,
       "maintenance": "",
       "name": "PackageKit",
@@ -7565,7 +7837,8 @@
       "reason": "mpm 8.0.1 requires >=0.7.0.",
       "requirement": ">=0.7.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkcon.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkcon.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pkg",
@@ -7585,6 +7858,7 @@
       "cli_names": [
         "pkg"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -7592,6 +7866,7 @@
       "keywords": [
         "freebsd"
       ],
+      "launcher": "pkg",
       "maintained": true,
       "maintenance": "",
       "name": "FreeBSD pkg",
@@ -7601,7 +7876,8 @@
       "reason": "mpm 8.0.1 requires >=1.11.",
       "requirement": ">=1.11",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkg.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkg.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pkg-tools",
@@ -7618,6 +7894,7 @@
       "cli_names": [
         "pkg_info"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -7625,6 +7902,7 @@
       "keywords": [
         "openbsd"
       ],
+      "launcher": "pkg_info",
       "maintained": true,
       "maintenance": "",
       "name": "OpenBSD pkg tools",
@@ -7634,7 +7912,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkg_tools.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkg_tools.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "pkgin",
@@ -7652,6 +7931,7 @@
       "cli_names": [
         "pkgin"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -7660,6 +7940,7 @@
         "netbsd",
         "pkgsrc"
       ],
+      "launcher": "pkgin",
       "maintained": true,
       "maintenance": "",
       "name": "Pkgin",
@@ -7669,7 +7950,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkgin.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkgin.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "pkgit",
@@ -7682,11 +7964,13 @@
       "cli_names": [
         "pkgit"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "pkgit",
       "keywords": [],
+      "launcher": "pkgit",
       "maintained": true,
       "maintenance": "",
       "name": "pkgit",
@@ -7747,7 +8031,8 @@
       "reason": "mpm 8.0.1 requires >=1.2.0.",
       "requirement": ">=1.2.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkgit.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkgit.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pkgm",
@@ -7761,11 +8046,13 @@
       "cli_names": [
         "pkgm"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "pkgm",
       "keywords": [],
+      "launcher": "pkgm",
       "maintained": true,
       "maintenance": "",
       "name": "pkgm",
@@ -7827,7 +8114,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkgm.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkgm.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "platformio-core",
@@ -7838,11 +8126,13 @@
       "cli_names": [
         "pio"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "platformio-core",
       "keywords": [],
+      "launcher": "pio",
       "maintained": true,
       "maintenance": "",
       "name": "PlatformIO Core",
@@ -7905,7 +8195,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/platformio_core.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/platformio_core.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "pnpm",
@@ -7922,12 +8213,14 @@
       "cli_names": [
         "pnpm"
       ],
+      "component_kind": "executable",
       "groups": [
         "node",
         "unknown"
       ],
       "id": "pnpm",
       "keywords": [],
+      "launcher": "pnpm",
       "maintained": true,
       "maintenance": "",
       "name": "Node pnpm",
@@ -8003,7 +8296,8 @@
       "reason": "mpm 8.0.1 requires >=11.0.0.",
       "requirement": ">=11.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pnpm.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pnpm.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "ports",
@@ -8020,6 +8314,7 @@
       "cli_names": [
         "make"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -8027,6 +8322,7 @@
       "keywords": [
         "freebsd ports"
       ],
+      "launcher": "make",
       "maintained": true,
       "maintenance": "",
       "name": "FreeBSD Ports Collection",
@@ -8036,7 +8332,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkg.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pkg.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "prt-get",
@@ -8053,6 +8350,7 @@
       "cli_names": [
         "prt-get"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -8060,6 +8358,7 @@
       "keywords": [
         "crux"
       ],
+      "launcher": "prt-get",
       "maintained": true,
       "maintenance": "",
       "name": "CRUX prt-get",
@@ -8069,7 +8368,8 @@
       "reason": "mpm 8.0.1 requires >=5.19.",
       "requirement": ">=5.19",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/prt_get.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/prt_get.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pwsh-gallery",
@@ -8085,6 +8385,7 @@
       "cli_names": [
         "pwsh"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -8095,6 +8396,7 @@
         "psgallery",
         "psresourceget"
       ],
+      "launcher": "pwsh",
       "maintained": true,
       "maintenance": "",
       "name": "PowerShell Gallery",
@@ -8157,7 +8459,8 @@
       "reason": "mpm 8.0.1 requires >=7.4.0.",
       "requirement": ">=7.4.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pwsh_gallery.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pwsh_gallery.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "pyenv",
@@ -8170,11 +8473,13 @@
       "cli_names": [
         "pyenv"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "pyenv",
       "keywords": [],
+      "launcher": "pyenv",
       "maintained": true,
       "maintenance": "",
       "name": "Python pyenv",
@@ -8236,7 +8541,8 @@
       "reason": "mpm 8.0.1 requires >=2.3.13.",
       "requirement": ">=2.3.13",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pyenv.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pyenv.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "raco",
@@ -8250,11 +8556,13 @@
       "cli_names": [
         "raco"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "raco",
       "keywords": [],
+      "launcher": "raco",
       "maintained": true,
       "maintenance": "",
       "name": "raco",
@@ -8317,7 +8625,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/raco.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/raco.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "roswell",
@@ -8328,6 +8637,7 @@
       "cli_names": [
         "ros"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -8336,6 +8646,7 @@
         "common lisp",
         "quicklisp"
       ],
+      "launcher": "ros",
       "maintained": true,
       "maintenance": "",
       "name": "Roswell",
@@ -8411,7 +8722,8 @@
       "reason": "mpm 8.0.1 requires >=22.12.14.113.",
       "requirement": ">=22.12.14.113",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/roswell.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/roswell.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "rustup",
@@ -8426,6 +8738,7 @@
       "cli_names": [
         "rustup"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "runtimes",
@@ -8433,6 +8746,7 @@
       ],
       "id": "rustup",
       "keywords": [],
+      "launcher": "rustup",
       "maintained": true,
       "maintenance": "",
       "name": "Rust rustup",
@@ -8495,7 +8809,8 @@
       "reason": "mpm 8.0.1 requires >=1.28.0.",
       "requirement": ">=1.28.0",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/rustup.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/rustup.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "scoop",
@@ -8514,12 +8829,14 @@
       "cli_names": [
         "scoop"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "system"
       ],
       "id": "scoop",
       "keywords": [],
+      "launcher": "scoop",
       "maintained": true,
       "maintenance": "",
       "name": "Scoop",
@@ -8529,7 +8846,8 @@
       "reason": "mpm 8.0.1 requires >=0.2.4.",
       "requirement": ">=0.2.4",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/scoop.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/scoop.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "sdkman",
@@ -8546,6 +8864,7 @@
       "cli_names": [
         "sdkman-init.sh"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -8553,6 +8872,7 @@
       "keywords": [
         "sdk man"
       ],
+      "launcher": "sdkman-init.sh",
       "maintained": true,
       "maintenance": "",
       "name": "SDKMAN",
@@ -8614,7 +8934,8 @@
       "reason": "mpm 8.0.1 requires >=5.0.0.",
       "requirement": ">=5.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/sdkman.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/sdkman.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "sfsu",
@@ -8632,11 +8953,13 @@
       "cli_names": [
         "sfsu"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "sfsu",
       "keywords": [],
+      "launcher": "sfsu",
       "maintained": true,
       "maintenance": "",
       "name": "Scoop sfsu",
@@ -8646,7 +8969,8 @@
       "reason": "mpm 8.0.1 requires >=1.16.0.",
       "requirement": ">=1.16.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/sfsu.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/sfsu.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "sheldon",
@@ -8657,11 +8981,13 @@
       "cli_names": [
         "sheldon"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "sheldon",
       "keywords": [],
+      "launcher": "sheldon",
       "maintained": true,
       "maintenance": "",
       "name": "Sheldon",
@@ -8723,7 +9049,8 @@
       "reason": "mpm 8.0.1 requires >=0.6.0.",
       "requirement": ">=0.6.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/sheldon.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/sheldon.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "shelly",
@@ -8741,12 +9068,14 @@
       "cli_names": [
         "shelly"
       ],
+      "component_kind": "executable",
       "groups": [
         "arch",
         "unknown"
       ],
       "id": "shelly",
       "keywords": [],
+      "launcher": "shelly",
       "maintained": true,
       "maintenance": "",
       "name": "Shelly",
@@ -8759,7 +9088,8 @@
       "reason": "mpm 8.0.1 requires >=3.0.0.",
       "requirement": ">=3.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/shelly.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/shelly.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "skills",
@@ -8771,11 +9101,13 @@
       "cli_names": [
         "skills"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "skills",
       "keywords": [],
+      "launcher": "skills",
       "maintained": true,
       "maintenance": "",
       "name": "Agent Skills",
@@ -8838,7 +9170,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/skills.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/skills.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "slapt-get",
@@ -8855,6 +9188,7 @@
       "cli_names": [
         "slapt-get"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -8862,6 +9196,7 @@
       "keywords": [
         "slackware"
       ],
+      "launcher": "slapt-get",
       "maintained": true,
       "maintenance": "",
       "name": "slapt-get",
@@ -8871,7 +9206,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/slapt_get.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/slapt_get.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "snap",
@@ -8887,6 +9223,7 @@
       "cli_names": [
         "snap"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "system"
@@ -8895,6 +9232,7 @@
       "keywords": [
         "snapcraft"
       ],
+      "launcher": "snap",
       "maintained": true,
       "maintenance": "",
       "name": "Snap",
@@ -8968,7 +9306,8 @@
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/snap.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/snap.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "soar",
@@ -8985,11 +9324,13 @@
       "cli_names": [
         "soar"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "soar",
       "keywords": [],
+      "launcher": "soar",
       "maintained": true,
       "maintenance": "",
       "name": "Soar",
@@ -9050,7 +9391,8 @@
       "reason": "mpm 8.0.1 requires >=0.12.0.",
       "requirement": ">=0.12.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/soar.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/soar.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "sorcery",
@@ -9067,6 +9409,7 @@
       "cli_names": [
         "sorcery"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -9074,6 +9417,7 @@
       "keywords": [
         "source mage"
       ],
+      "launcher": "sorcery",
       "maintained": true,
       "maintenance": "[Source Mage](https://sourcemage.org) is a small, slow-moving distribution; its `sorcery` scripts still receive commits but formal releases are rare.",
       "name": "Sorcery",
@@ -9083,7 +9427,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/sorcery.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/sorcery.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "spack",
@@ -9098,11 +9443,13 @@
       "cli_names": [
         "spack"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "spack",
       "keywords": [],
+      "launcher": "spack",
       "maintained": true,
       "maintenance": "",
       "name": "Spack",
@@ -9164,7 +9511,8 @@
       "reason": "mpm 8.0.1 requires >=1.0.0.",
       "requirement": ">=1.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/spack.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/spack.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "steamcmd",
@@ -9174,6 +9522,7 @@
       "cli_names": [
         "steamcmd"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -9181,6 +9530,7 @@
       "keywords": [
         "valve"
       ],
+      "launcher": "steamcmd",
       "maintained": true,
       "maintenance": "",
       "name": "Valve SteamCMD",
@@ -9256,7 +9606,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/steamcmd.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/steamcmd.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "stew",
@@ -9270,11 +9621,13 @@
       "cli_names": [
         "stew"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "stew",
       "keywords": [],
+      "launcher": "stew",
       "maintained": true,
       "maintenance": "[stew](https://github.com/marwanhawari/stew) is a single-maintainer project; its last release was `0.6.0` (April 2025) and issues have since accumulated, though it is not archived.",
       "name": "stew",
@@ -9337,7 +9690,8 @@
       "reason": "mpm 8.0.1 requires >=0.3.0.",
       "requirement": ">=0.3.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/stew.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/stew.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "sun-tools",
@@ -9348,6 +9702,7 @@
       "cli_names": [
         "pkginfo"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -9356,6 +9711,7 @@
         "solaris",
         "svr4"
       ],
+      "launcher": "pkginfo",
       "maintained": true,
       "maintenance": "The SVR4 packaging commands are legacy, superseded by IPS since Solaris 11, but still shipped and supported on [Oracle Solaris 11.4](https://docs.oracle.com/cd/E37838_01/html/E61051/pkgsvr4.html), whose support runs through 2037.",
       "name": "Solaris SVR4 package tools",
@@ -9366,7 +9722,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/sun_tools.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/sun_tools.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "swupd",
@@ -9381,6 +9738,7 @@
       "cli_names": [
         "swupd"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -9389,6 +9747,7 @@
         "clear linux",
         "clearlinux"
       ],
+      "launcher": "swupd",
       "maintained": false,
       "maintenance": "Intel discontinued Clear Linux OS in July 2025 and the [swupd-client repository](https://github.com/clearlinux/swupd-client) is archived read-only, so `swupd` no longer receives updates.",
       "name": "Clear Linux Software Updater",
@@ -9398,7 +9757,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/swupd.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/swupd.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "tazpkg",
@@ -9415,6 +9775,7 @@
       "cli_names": [
         "tazpkg"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -9422,6 +9783,7 @@
       "keywords": [
         "slitaz"
       ],
+      "launcher": "tazpkg",
       "maintained": true,
       "maintenance": "[SliTaz](https://slitaz.org) has published no stable ISO since 5.0 (2023) but shows active development into 2026; `tazpkg` remains its native package manager.",
       "name": "TazPkg",
@@ -9431,7 +9793,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/tazpkg.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/tazpkg.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "tlmgr",
@@ -9450,6 +9813,7 @@
       "cli_names": [
         "tlmgr"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -9459,6 +9823,7 @@
         "tex live",
         "texlive"
       ],
+      "launcher": "tlmgr",
       "maintained": true,
       "maintenance": "",
       "name": "TeX Live Manager",
@@ -9534,7 +9899,8 @@
       "reason": "mpm 8.0.1 requires >=2018.",
       "requirement": ">=2018",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/tlmgr.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/tlmgr.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "topgrade",
@@ -9544,11 +9910,13 @@
       "cli_names": [
         "topgrade"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "topgrade",
       "keywords": [],
+      "launcher": "topgrade",
       "maintained": true,
       "maintenance": "",
       "name": "Topgrade",
@@ -9617,7 +9985,8 @@
       "reason": "mpm 8.0.1 requires >=17.0.0.",
       "requirement": ">=17.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/topgrade.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/topgrade.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "trizen",
@@ -9637,6 +10006,7 @@
       "cli_names": [
         "trizen"
       ],
+      "component_kind": "executable",
       "groups": [
         "arch",
         "unknown"
@@ -9645,6 +10015,7 @@
       "keywords": [
         "arch"
       ],
+      "launcher": "trizen",
       "maintained": true,
       "maintenance": "",
       "name": "Arch Linux trizen",
@@ -9718,7 +10089,8 @@
       "reason": "mpm 8.0.1 requires >=1.0.0.",
       "requirement": ">=1.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "urpmi",
@@ -9736,6 +10108,7 @@
       "cli_names": [
         "urpmi"
       ],
+      "component_kind": "executable",
       "groups": [
         "rpm",
         "unknown"
@@ -9744,6 +10117,7 @@
       "keywords": [
         "mageia"
       ],
+      "launcher": "urpmi",
       "maintained": true,
       "maintenance": "",
       "name": "urpmi",
@@ -9754,7 +10128,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/urpmi.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/urpmi.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "uv",
@@ -9770,12 +10145,14 @@
       "cli_names": [
         "uv"
       ],
+      "component_kind": "executable",
       "groups": [
         "environment",
         "python"
       ],
       "id": "uv-pip",
       "keywords": [],
+      "launcher": "uv",
       "maintained": true,
       "maintenance": "",
       "name": "uv pip environment",
@@ -9851,7 +10228,8 @@
       "reason": "mpm 8.0.1 requires >=0.5.0.",
       "requirement": ">=0.5.0",
       "scope": "environment",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/uv.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/uv.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "uvx",
@@ -9866,12 +10244,14 @@
       "cli_names": [
         "uv"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "python"
       ],
       "id": "uvx",
       "keywords": [],
+      "launcher": "uv",
       "maintained": true,
       "maintenance": "",
       "name": "uv tools",
@@ -9947,7 +10327,8 @@
       "reason": "mpm 8.0.1 requires >=0.10.10.",
       "requirement": ">=0.10.10",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/uv.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/uv.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "vagrant",
@@ -9964,11 +10345,13 @@
       "cli_names": [
         "vagrant"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "vagrant",
       "keywords": [],
+      "launcher": "vagrant",
       "maintained": true,
       "maintenance": "Upstream has slowed: the last stable release is `2.4.9` of August 2025, though the repository is still committed to. Note also that Vagrant is distributed under the Business Source License from `2.4.3` onwards, which some distributions treat as non-free.",
       "name": "Vagrant",
@@ -10031,7 +10414,8 @@
       "reason": "mpm 8.0.1 requires >=2.4.0.",
       "requirement": ">=2.4.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/vagrant.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/vagrant.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "vcpkg",
@@ -10047,11 +10431,13 @@
       "cli_names": [
         "vcpkg"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "vcpkg",
       "keywords": [],
+      "launcher": "vcpkg",
       "maintained": true,
       "maintenance": "",
       "name": "vcpkg",
@@ -10114,7 +10500,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/vcpkg.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/vcpkg.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "vim-pack",
@@ -10128,11 +10515,13 @@
       "cli_names": [
         "nvim"
       ],
+      "component_kind": "hosted",
       "groups": [
         "unknown"
       ],
       "id": "vim-pack",
       "keywords": [],
+      "launcher": "nvim",
       "maintained": true,
       "maintenance": "",
       "name": "Neovim vim-pack",
@@ -10208,7 +10597,8 @@
       "reason": "mpm 8.0.1 requires >=0.12.0.",
       "requirement": ">=0.12.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/neovim.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/neovim.py",
+      "version_subject": "launcher"
     },
     {
       "backend_id": "volta",
@@ -10221,6 +10611,7 @@
       "cli_names": [
         "volta"
       ],
+      "component_kind": "executable",
       "groups": [
         "node",
         "runtimes",
@@ -10228,6 +10619,7 @@
       ],
       "id": "volta",
       "keywords": [],
+      "launcher": "volta",
       "maintained": false,
       "maintenance": "Volta's maintainers [declared the project unmaintained on 2025-11-14](https://github.com/volta-cli/volta/issues/2080) and recommend migrating to [`mise`](https://mise.jdx.dev). The final release, [`2.0.2`](https://github.com/volta-cli/volta/releases/tag/v2.0.2), dates back to 2024-12-05.",
       "name": "Volta",
@@ -10290,7 +10682,8 @@
       "reason": "mpm 8.0.1 requires >=1.0.2.",
       "requirement": ">=1.0.2",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/volta.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/volta.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "vscode",
@@ -10302,6 +10695,7 @@
       "cli_names": [
         "code"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -10310,6 +10704,7 @@
         "visual studio",
         "visual studio code"
       ],
+      "launcher": "code",
       "maintained": true,
       "maintenance": "",
       "name": "Visual Studio Code",
@@ -10385,7 +10780,8 @@
       "reason": "mpm 8.0.1 requires >=1.60.0.",
       "requirement": ">=1.60.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/vscode.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/vscode.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "vscodium",
@@ -10397,11 +10793,13 @@
       "cli_names": [
         "codium"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "vscodium",
       "keywords": [],
+      "launcher": "codium",
       "maintained": true,
       "maintenance": "",
       "name": "VSCodium",
@@ -10477,7 +10875,8 @@
       "reason": "mpm 8.0.1 requires >=1.60.0.",
       "requirement": ">=1.60.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/vscodium.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/vscodium.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "winget",
@@ -10494,12 +10893,14 @@
       "cli_names": [
         "winget"
       ],
+      "component_kind": "executable",
       "groups": [
         "global",
         "system"
       ],
       "id": "winget",
       "keywords": [],
+      "launcher": "winget",
       "maintained": true,
       "maintenance": "",
       "name": "WinGet",
@@ -10509,7 +10910,8 @@
       "reason": "mpm 8.0.1 requires >=1.29.280.",
       "requirement": ">=1.29.280",
       "scope": "global",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/winget.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/winget.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "xbps",
@@ -10529,6 +10931,7 @@
       "cli_names": [
         "xbps-install"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
@@ -10536,6 +10939,7 @@
       "keywords": [
         "void linux"
       ],
+      "launcher": "xbps-install",
       "maintained": true,
       "maintenance": "",
       "name": "Void XBPS",
@@ -10596,7 +11000,8 @@
       "reason": "mpm 8.0.1 requires >=0.59.",
       "requirement": ">=0.59",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/xbps.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/xbps.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "xcodes",
@@ -10608,11 +11013,13 @@
       "cli_names": [
         "xcodes"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "xcodes",
       "keywords": [],
+      "launcher": "xcodes",
       "maintained": true,
       "maintenance": "",
       "name": "Xcode xcodes",
@@ -10622,7 +11029,8 @@
       "reason": "mpm 8.0.1 requires >=1.0.0.",
       "requirement": ">=1.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/xcodes.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/xcodes.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "yarn",
@@ -10639,12 +11047,14 @@
       "cli_names": [
         "yarn"
       ],
+      "component_kind": "executable",
       "groups": [
         "node",
         "unknown"
       ],
       "id": "yarn",
       "keywords": [],
+      "launcher": "yarn",
       "maintained": true,
       "maintenance": "Yarn Classic (`1.x`) is [frozen](https://github.com/yarnpkg/yarn), taking only security fixes; the actively developed [Yarn Berry](https://github.com/yarnpkg/berry) line has a different CLI and is wrapped separately as the `yarn-berry` manager.",
       "name": "Yarn Classic",
@@ -10720,7 +11130,8 @@
       "reason": "mpm 8.0.1 requires >=1.20.0,<2.0.0.",
       "requirement": ">=1.20.0,<2.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/yarn.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/yarn.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "yarn-berry",
@@ -10731,12 +11142,14 @@
       "cli_names": [
         "yarn"
       ],
+      "component_kind": "executable",
       "groups": [
         "node",
         "unknown"
       ],
       "id": "yarn-berry",
       "keywords": [],
+      "launcher": "yarn",
       "maintained": true,
       "maintenance": "",
       "name": "Yarn Berry",
@@ -10812,7 +11225,8 @@
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/yarn.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/yarn.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "yay",
@@ -10832,6 +11246,7 @@
       "cli_names": [
         "yay"
       ],
+      "component_kind": "executable",
       "groups": [
         "arch",
         "unknown"
@@ -10840,6 +11255,7 @@
       "keywords": [
         "arch"
       ],
+      "launcher": "yay",
       "maintained": true,
       "maintenance": "",
       "name": "Arch Linux yay",
@@ -10913,7 +11329,8 @@
       "reason": "mpm 8.0.1 requires >=11.0.0.",
       "requirement": ">=11.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/pacman.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "yazi",
@@ -10927,11 +11344,13 @@
       "cli_names": [
         "ya"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "yazi",
       "keywords": [],
+      "launcher": "ya",
       "maintained": true,
       "maintenance": "",
       "name": "Yazi ya",
@@ -11007,7 +11426,8 @@
       "reason": "mpm 8.0.1 requires >=25.2.7.",
       "requirement": ">=25.2.7",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/yazi.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/yazi.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "yum",
@@ -11027,6 +11447,7 @@
       "cli_names": [
         "yum"
       ],
+      "component_kind": "executable",
       "groups": [
         "rpm",
         "unknown"
@@ -11038,6 +11459,7 @@
         "rhel",
         "rpm"
       ],
+      "launcher": "yum",
       "maintained": true,
       "maintenance": "The standalone [yum project is archived](https://github.com/rpm-software-management/yum); on modern RHEL and Fedora the `yum` command is a maintained compatibility alias for [dnf](https://github.com/rpm-software-management/dnf).",
       "name": "Fedora YUM",
@@ -11111,7 +11533,8 @@
       "reason": "mpm 8.0.1 requires >=4.0.0.",
       "requirement": ">=4.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/dnf.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/dnf.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "zef",
@@ -11127,11 +11550,13 @@
       "cli_names": [
         "zef"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "zef",
       "keywords": [],
+      "launcher": "zef",
       "maintained": true,
       "maintenance": "",
       "name": "Zef",
@@ -11207,7 +11632,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zef.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zef.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "zerobrew",
@@ -11222,11 +11648,13 @@
       "cli_names": [
         "zb"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "zerobrew",
       "keywords": [],
+      "launcher": "zb",
       "maintained": true,
       "maintenance": "",
       "name": "zerobrew",
@@ -11288,7 +11716,8 @@
       "reason": "mpm 8.0.1 requires >=0.3.0.",
       "requirement": ">=0.3.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zerobrew.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zerobrew.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "zeroinstall",
@@ -11300,11 +11729,13 @@
       "cli_names": [
         "0install"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "zeroinstall",
       "keywords": [],
+      "launcher": "0install",
       "maintained": true,
       "maintenance": "",
       "name": "Zero Install",
@@ -11380,7 +11811,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zero_install.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zero_install.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "zim",
@@ -11391,11 +11823,13 @@
       "cli_names": [
         "zsh"
       ],
+      "component_kind": "shell",
       "groups": [
         "unknown"
       ],
       "id": "zim",
       "keywords": [],
+      "launcher": "zsh",
       "maintained": true,
       "maintenance": "",
       "name": "Zsh Zim",
@@ -11457,7 +11891,8 @@
       "reason": "mpm 8.0.1 requires >=1.0.0.",
       "requirement": ">=1.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zim.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zim.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "zinit",
@@ -11471,11 +11906,13 @@
       "cli_names": [
         "zsh"
       ],
+      "component_kind": "shell",
       "groups": [
         "unknown"
       ],
       "id": "zinit",
       "keywords": [],
+      "launcher": "zsh",
       "maintained": true,
       "maintenance": "",
       "name": "Zinit",
@@ -11537,7 +11974,8 @@
       "reason": "mpm 8.0.1 requires >=3.10.0.",
       "requirement": ">=3.10.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zinit.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zinit.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "zplug",
@@ -11549,11 +11987,13 @@
       "cli_names": [
         "zsh"
       ],
+      "component_kind": "shell",
       "groups": [
         "unknown"
       ],
       "id": "zplug",
       "keywords": [],
+      "launcher": "zsh",
       "maintained": true,
       "maintenance": "",
       "name": "Zsh zplug",
@@ -11615,7 +12055,8 @@
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zplug.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zplug.py",
+      "version_subject": "component"
     },
     {
       "backend_id": "zvm",
@@ -11629,11 +12070,13 @@
       "cli_names": [
         "zvm"
       ],
+      "component_kind": "executable",
       "groups": [
         "unknown"
       ],
       "id": "zvm",
       "keywords": [],
+      "launcher": "zvm",
       "maintained": true,
       "maintenance": "",
       "name": "zvm",
@@ -11696,7 +12139,8 @@
       "reason": "",
       "requirement": "",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zvm.toml"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zvm.toml",
+      "version_subject": "component"
     },
     {
       "backend_id": "zypper",
@@ -11715,6 +12159,7 @@
       "cli_names": [
         "zypper"
       ],
+      "component_kind": "executable",
       "groups": [
         "rpm",
         "unknown"
@@ -11724,6 +12169,7 @@
         "opensuse",
         "suse"
       ],
+      "launcher": "zypper",
       "maintained": true,
       "maintenance": "",
       "name": "openSUSE Zypper",
@@ -11797,7 +12243,8 @@
       "reason": "mpm 8.0.1 requires >=1.14.0.",
       "requirement": ">=1.14.0",
       "scope": "unknown",
-      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zypper.py"
+      "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/zypper.py",
+      "version_subject": "component"
     }
   ],
   "schema_version": 1

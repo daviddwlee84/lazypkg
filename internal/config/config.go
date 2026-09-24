@@ -20,6 +20,7 @@ type Config struct {
 	ManagerSets       map[string][]string `toml:"manager_sets" json:"manager_sets,omitempty"`
 	DefaultManagerSet string              `toml:"default_manager_set" json:"default_manager_set,omitempty"`
 	Mouse             *bool               `toml:"mouse" json:"mouse,omitempty"`
+	QueryCache        *bool               `toml:"query_cache" json:"query_cache,omitempty"`
 	TimeoutSeconds    int                 `toml:"timeout_seconds" json:"timeout_seconds"`
 	Path              string              `toml:"-" json:"config_path"`
 	DataDir           string              `toml:"-" json:"data_dir"`

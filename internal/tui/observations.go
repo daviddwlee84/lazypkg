@@ -16,6 +16,7 @@ type inventoryState struct {
 	generation             uint64
 	cancel                 context.CancelFunc
 	err                    error
+	providers              map[string]providerState
 }
 type inventoryMsg struct {
 	key        string
@@ -108,13 +109,11 @@ func (m *Model) ensureInventory(force bool) tea.Cmd {
 	cached.cancel = cancel
 	cached.generation++
 	cached.loading = true
-	generation, service := cached.generation, m.service
+	generation := cached.generation
 	request := domain.PackageQuery{Kind: "installed", Managers: m.effectiveManagers(), Refresh: force}
+	cached.providers = make(map[string]providerState)
 	m.attachDiscover()
-	return func() tea.Msg {
-		snapshot, err := service.Query(ctx, request)
-		return inventoryMsg{key, generation, snapshot, err}
-	}
+	return m.startStream(ctx, request, streamTarget{inventoryKey: key, generation: generation})
 }
 
 func (m *Model) acceptInventory(msg inventoryMsg) {

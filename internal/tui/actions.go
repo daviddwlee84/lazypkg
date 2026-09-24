@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/daviddwlee84/lazypkg/internal/domain"
@@ -38,7 +39,16 @@ func (m *Model) actions() []binding {
 		out = append(out, binding{"d", "diagnose command", "diagnose"})
 	}
 	s := &m.states[m.view]
-	if s.loading || s.stale || s.err != nil || s.retainedManagers[p.Manager] {
+	ready := !s.loading && !s.stale && s.err == nil && !s.retainedManagers[p.Manager]
+	if s.streaming {
+		ready = s.providers[p.Manager].ready
+		for _, coverage := range s.snapshot.Coverage {
+			if coverage.Manager == p.Manager && observationExpired(coverage.ObservedAt, time.Now()) {
+				ready = false
+			}
+		}
+	}
+	if !ready {
 		return out
 	}
 	if m.view == discoverView && s.acceptedQuery != s.query {
@@ -208,6 +218,9 @@ func (m *Model) reviewSetup() tea.Cmd {
 
 func (m *Model) modalKey(key tea.KeyPressMsg) tea.Cmd {
 	name := key.String()
+	if m.modal == resolutionModal || m.modal == maintenanceModal || m.modal == promptModal || m.modal == exportPromptModal {
+		return m.workflowKey(key)
+	}
 	if m.modal == providersModal {
 		return m.providersKey(key)
 	}
@@ -242,8 +255,24 @@ func (m *Model) modalKey(key tea.KeyPressMsg) tea.Cmd {
 			return m.loadSetup()
 		}
 	case planModal:
+		if name == "p" {
+			return m.openPrompt()
+		}
+		if m.planReturn == maintenanceModal && (name == "s" || name == "q") {
+			m.closeModal()
+			if name == "s" {
+				m.skipMaintenance()
+			} else {
+				m.closeWorkflow()
+			}
+			return nil
+		}
 		if name == "y" && !key.IsRepeat && !m.planLoading && m.planErr == nil && m.planExecutable() && !m.executing && m.width >= 40 && m.height >= 10 {
 			m.executing = true
+			for i := range m.states {
+				m.cancelView(viewID(i))
+			}
+			m.invalidateInventories()
 			runner := &execution{ctx: m.ctx, service: m.service, plan: m.plan}
 			generation := m.planGeneration
 			return tea.Exec(runner, func(err error) tea.Msg { return executedMsg{generation, runner.result, err} })
@@ -258,6 +287,12 @@ func (m *Model) modalKey(key tea.KeyPressMsg) tea.Cmd {
 			return nil
 		}
 	case detailsModal:
+		if name == "R" {
+			return m.startConflict()
+		}
+		if name == "p" {
+			return m.openPrompt()
+		}
 		for _, action := range m.actions() {
 			if name == action.key {
 				return m.requestAction(action.operation)
@@ -295,6 +330,10 @@ func (m *Model) planExecutable() bool {
 }
 
 func (m *Model) closeModal() {
+	if m.modal == resolutionModal || m.modal == maintenanceModal || m.modal == promptModal || m.modal == exportPromptModal {
+		m.closeWorkflow()
+		return
+	}
 	if m.modal == saveSetModal {
 		if m.providerPicker.saving {
 			return
@@ -350,6 +389,7 @@ func (m *Model) helpText() string {
 		"While typing, letters remain text. Enter accepts the query; Esc clears it.", "r   Refresh the current view; Esc cancels a pending read",
 		"", "Manage", "s   Set up the backend or additional managers", "e   Read errors and partial-coverage details", "v   View the last operation result",
 		"i   Install a Discover result", "u   Upgrade an installed package when supported", "x   Review removal; a   Review mise global activation", "d   Diagnose a package's first recorded command across all providers",
+		"R   Resolve a recorded command: choose what to keep, review one removal at a time", "U   Manager maintenance queue; each update/refresh needs a separate review", "p   Preview a context prompt, then c copies or e exports exactly that Markdown",
 		"Only applicable actions appear in the footer. Every change requires a plan and y to confirm.",
 		"", "Providers & mouse", "f   Choose groups or saved sets; Space/click loads a preset or toggles a manager", "[ / ]   Move a selected manager earlier/later in the picker priority order", "Enter applies the draft once; S saves a named set and can make it the default", "M   Toggle mouse capture; tabs, rows, visible buttons and checkboxes are clickable", "Wheel scrolls the hovered pane. Dragging off a button cancels the click.", "Managers: b toggles detected/all catalog; r forces update checks; u reviews an owner update",
 		"", "Scope", "Installed packages, recognized applications, and executables are different observations.",
@@ -380,6 +420,23 @@ func (m *Model) issuesText() string {
 	s := &m.states[m.view]
 	if s.err != nil {
 		lines = append(lines, viewNames[m.view]+": "+s.err.Error())
+	}
+	for _, coverage := range s.snapshot.Coverage {
+		progress := s.providers[coverage.Manager]
+		label := coverage.Manager + ": " + coverage.State
+		if coverage.Stale {
+			label += " (stale)"
+		}
+		if progress.elapsed > 0 {
+			label += " · " + progress.elapsed.Round(time.Millisecond).String()
+		}
+		if coverage.Enrichment != "" {
+			label += " · ownership " + coverage.Enrichment
+		}
+		if coverage.Message != "" {
+			label += " · " + coverage.Message
+		}
+		lines = append(lines, label)
 	}
 	issues := s.snapshot.Issues
 	if m.view == diagnosticsView {

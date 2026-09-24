@@ -93,8 +93,9 @@ def main() -> None:
                 raise AssertionError(f"Dashboard exited unexpectedly: {child.returncode}")
 
         try:
-            read_for(1.3)
+            read_for(0.75)
             require("alpha")
+            require("ownership pending")
             if b"\x1b[?1002h" not in capture:
                 raise AssertionError("Mouse cell-motion reporting was not enabled")
             click(26, 7)  # Select the second item using actual SGR mouse input.
@@ -153,6 +154,47 @@ def main() -> None:
             send(b"v")
             require("Last operation")
             send(b"\x1b")
+            send(b"4", 0.4)
+            send(b"R", 0.3)
+            require("Resolve alpha")
+            send(b"K")  # Retained instance is a separate explicit choice.
+            click(6, 6)  # Select just the second installation.
+            send(b"\r")
+            require("Remove one fixture installation")
+            require("KEEP: brew")
+            send(b"y", 0.4)
+            send(b"continue\r", 0.4)
+            if json.loads(receipt.read_text())["calls"] != 2:
+                raise AssertionError("Resolution did not execute exactly one reviewed target")
+            send(b"\r", 0.5)
+            require("reassessing")
+            send(b"\x1b")
+            send(b"U", 0.3)
+            require("Manager maintenance")
+            send(b"\r")
+            require("Update fixture manager")
+            send(b"s")  # Skip the reviewed update and inspect guidance.
+            require("skipped")
+            send(b"\r")
+            if json.loads(receipt.read_text())["calls"] != 2:
+                raise AssertionError("Guidance/skip executed a maintenance job")
+            send(b"g\r")  # Explicitly return to review this one fixture job.
+            send(b"y", 0.4)
+            send(b"continue\r", 0.4)
+            if json.loads(receipt.read_text())["calls"] != 3:
+                raise AssertionError("Maintenance did not execute exactly one reviewed job")
+            send(b"\r", 0.5)
+            require("Rechecking")
+            send(b"p", 0.3)
+            require("Prompt preview")
+            require("Fixture prompt")
+            send(b"e")
+            export = scratch / "handoff.md"
+            send(b"\x01\x0b" + str(export).encode() + b"\r", 0.4)
+            if export.read_text() != "# Fixture prompt\n\nCurrent context only.\n":
+                raise AssertionError("Export differs from the previewed prompt")
+            send(b"\x1b")  # Return from preview to queue.
+            send(b"\x1b")  # Stop the queue; never execute remaining jobs.
             fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 16, 48, 0, 0))
             child.send_signal(signal.SIGWINCH)
             read_for(0.3)
@@ -171,15 +213,16 @@ def main() -> None:
                     raise AssertionError("Terminal ECHO/ICANON was not restored")
             if b"\x1b[?25h" not in capture or b"\x1b[?1049l" not in capture:
                 raise AssertionError("Missing cursor/alternate-screen restoration")
-            if json.loads(receipt.read_text())["calls"] != 1:
+            if json.loads(receipt.read_text())["calls"] != 3:
                 raise AssertionError("Unexpected extra fake mutation")
             print(
                 "PTY PASS: SGR mouse tabs/rows/buttons/checkboxes, ordered provider picker, "
-                "delayed reads, text/paste isolation, manager filter, search, "
+                "streamed base before enrichment, text/paste isolation, manager filter, search, "
                 "review/cancel, explicit approval, native prompt, result acknowledgement, "
+                "per-target resolution, maintenance skip/recheck, exact prompt export, "
                 "dashboard return, 48x16 resize, clean exit."
             )
-            print("Terminal ECHO/ICANON, cursor and alternate screen restored; fake mutations: 1.")
+            print("Terminal ECHO/ICANON, cursor and alternate screen restored; fake mutations: 3 (install, one removal, one manager update).")
         except BaseException:
             # repr keeps untrusted control bytes from reaching the invoking terminal.
             print(f"Terminal capture tail: {bytes(capture[-5000:])!r}", file=sys.stderr)

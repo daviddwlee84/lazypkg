@@ -125,6 +125,8 @@ func (m *Model) contextLine() string {
 		}
 	} else {
 		switch {
+		case s.loading && s.streaming:
+			state = "loading · " + m.streamStatus(s)
 		case s.loading && s.loaded:
 			state = "refreshing · previous results"
 		case s.loading:
@@ -339,6 +341,12 @@ func (m *Model) rowDetails(r row) string {
 		if !p.InventoryAt.IsZero() {
 			lines = append(lines, "Inventory observed: "+observed(p.InventoryAt))
 		}
+		if p.InventoryStale {
+			lines = append(lines, "", "STALE: cached observation; waiting for provider validation before package actions.")
+		}
+		if progress, ok := m.states[m.view].providers[p.Manager]; ok && progress.enrichment == "pending" {
+			lines = append(lines, "Ownership details are still being collected; base inventory is ready.")
+		}
 		if m.states[m.view].retainedManagers[p.Manager] {
 			lines = append(lines, "", "STALE: retained from the previous inventory because this provider's refresh failed. Refresh before changing it.")
 		}
@@ -384,6 +392,18 @@ func (m *Model) rowDetails(r row) string {
 	} else if manager := r.managerInfo; manager != nil {
 		lines = append(lines, manager.Name, "", "ID: "+manager.ID, "Status: "+manager.Status, "Version: "+orUnknown(manager.Version), "CLI: "+orUnknown(manager.Path), "", "Capabilities: "+strings.Join(manager.Capabilities, ", "))
 		lines = append(lines, "Scope: "+orUnknown(manager.Scope), "Required: "+orUnknown(manager.Requirement))
+		if manager.ComponentKind != "" {
+			lines = append(lines, "Component: "+manager.ComponentKind)
+		}
+		if manager.VersionSubject != "" {
+			lines = append(lines, "Version describes: "+manager.VersionSubject)
+		}
+		if manager.Launcher != "" {
+			lines = append(lines, "Launcher: "+manager.Launcher)
+		}
+		if manager.ReasonCode != "" {
+			lines = append(lines, "Detection: "+manager.ReasonCode)
+		}
 		if manager.Reason != "" {
 			lines = append(lines, "Reason: "+manager.Reason)
 		}
@@ -470,6 +490,18 @@ func (m *Model) modalView() string {
 		return m.providersView()
 	case saveSetModal:
 		return m.saveSetView()
+	case resolutionModal, maintenanceModal:
+		return m.workflowView()
+	case promptModal:
+		title = "Prompt preview"
+		text = m.workflow.prompt.Markdown
+		if m.workflow.loading {
+			text = "Collecting current context…"
+		} else if m.workflow.err != nil {
+			text = "Could not prepare prompt: " + m.workflow.err.Error()
+		}
+	case exportPromptModal:
+		return m.exportPromptView()
 	case planModal:
 		title = "Review changes"
 		if m.planLoading {
@@ -615,6 +647,18 @@ func (m *Model) saveSetView() string {
 func (m *Model) planText() string {
 	plan := m.plan
 	lines := []string{plan.Title, ""}
+	if resolution := plan.Resolution; resolution != nil {
+		lines = append(lines, "KEEP: "+resolution.Keep.Package.Manager+" / "+resolution.Keep.Package.ID+" "+resolution.Keep.Package.Version, "REMOVE: "+resolution.Remove.Package.Manager+" / "+resolution.Remove.Package.ID+" "+resolution.Remove.Package.Version, "Removed prefix: "+resolution.Remove.Prefix, "Affected commands: "+strings.Join(resolution.Remove.Commands, ", "))
+		for _, path := range resolution.Remove.Paths {
+			lines = append(lines, "Removed executable: "+path.Path)
+		}
+		for _, path := range resolution.Keep.Paths {
+			lines = append(lines, "Retained executable: "+path.Path)
+		}
+		for _, warning := range resolution.Remove.Warnings {
+			lines = append(lines, "WARNING: "+warning)
+		}
+	}
 	if health := plan.ManagerUpdate; health != nil {
 		lines = append(lines, "Manager: "+health.Manager, "Owner: "+orUnknown(health.Owner), "Strategy: "+orUnknown(health.Strategy))
 		if !health.ApplySupported {

@@ -6,16 +6,41 @@ import (
 	"encoding/json"
 	"github.com/daviddwlee84/lazypkg/internal/domain"
 	"io"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
 
 type fakeService struct {
-	executed     int
-	planned      int
-	queries      []domain.PackageQuery
-	healthChecks int
-	saved        []string
+	executed       int
+	planned        int
+	queries        []domain.PackageQuery
+	healthChecks   int
+	maintenanceIDs []string
+	saved          []string
+}
+
+func (f *fakeService) StreamQuery(ctx context.Context, q domain.PackageQuery) <-chan domain.QueryEvent {
+	ch := make(chan domain.QueryEvent, 1)
+	s, err := f.Query(ctx, q)
+	ch <- domain.QueryEvent{Stage: "done", Snapshot: s, Err: err}
+	close(ch)
+	return ch
+}
+func (f *fakeService) AssessConflict(context.Context, string) (domain.ConflictAssessment, error) {
+	return domain.ConflictAssessment{Name: "tool", Installations: []domain.ConflictInstallation{{ID: "keep", Package: domain.Package{Manager: "uvx", ID: "tool"}}}}, nil
+}
+func (f *fakeService) PlanResolution(_ context.Context, r domain.ResolutionRequest) (domain.ActionPlan, error) {
+	f.planned++
+	return domain.ActionPlan{Kind: "resolution", Title: "Remove one installation", Resolution: &domain.ResolutionPlan{Request: r}}, nil
+}
+func (f *fakeService) MaintenanceQueue(_ context.Context, ids []string, _ bool) (domain.MaintenanceQueue, error) {
+	f.maintenanceIDs = append([]string(nil), ids...)
+	return domain.MaintenanceQueue{Jobs: []domain.MaintenanceJob{{ID: "npm", Representative: "npm", ManagerIDs: []string{"npm"}, Category: "repair"}}}, nil
+}
+func (f *fakeService) RenderPrompt(context.Context, domain.PromptRequest) (domain.RenderedPrompt, error) {
+	return domain.RenderedPrompt{Recipe: "path-conflict", Markdown: "# Review\n\nCaptured evidence.\n"}, nil
 }
 
 func (f *fakeService) Managers(context.Context) ([]domain.Manager, error) {
@@ -169,6 +194,67 @@ func TestSessionScopeAppliesBeforePreferencesLoad(t *testing.T) {
 		if !reflect.DeepEqual(base.queries[len(base.queries)-1], q) {
 			t.Fatal("session override replaced an explicit query", q)
 		}
+	}
+}
+
+func TestWorkflowCommandsKeepReadsSeparateFromExplicitSingleApproval(t *testing.T) {
+	f := &fakeService{}
+	for _, args := range [][]string{{"resolve", "tool", "--json"}, {"managers", "maintain", "--dry-run", "--json"}, {"prompt", "render", "path-conflict", "tool", "--json"}, {"prompt", "list", "--json"}} {
+		out, _, err := invoke(f, args...)
+		if err != nil || !json.Valid([]byte(out)) || f.executed != 0 || f.planned != 0 {
+			t.Fatal(args, out, err, f)
+		}
+	}
+	_, _, err := invoke(f, "resolve", "tool", "--keep", "keep", "--remove", "remove", "--dry-run", "--json")
+	if err != nil || f.planned != 1 || f.executed != 0 {
+		t.Fatal(err, f)
+	}
+	_, _, err = invoke(f, "resolve", "tool", "--keep", "keep", "--remove", "remove", "--json")
+	if ExitCode(err) != 2 || f.executed != 0 {
+		t.Fatal(err, f)
+	}
+	_, _, err = invoke(f, "resolve", "tool", "--keep", "keep", "--remove", "remove", "--yes", "--json")
+	if err != nil || f.executed != 1 {
+		t.Fatal(err, f)
+	}
+	for _, args := range [][]string{{"resolve", "tool", "--keep", "keep"}, {"resolve", "tool", "--yes"}, {"resolve", "tool", "--interactive"}, {"managers", "maintain", "--interactive"}, {"managers", "maintain", "--yes"}, {"prompt", "render", "path-conflict"}, {"prompt", "render", "missing", "tool"}} {
+		_, _, err = invoke(f, args...)
+		if ExitCode(err) != 2 || f.executed != 1 {
+			t.Fatal(args, err, f)
+		}
+	}
+}
+
+func TestPromptExportMatchesPrintedPayloadAndProtectsExistingFile(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "review.md")
+	out, _, err := invoke(&fakeService{}, "prompt", "render", "path-conflict", "tool", "--output", file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(file)
+	if err != nil || string(data) != out {
+		t.Fatal(out, string(data), err)
+	}
+	_, _, err = invoke(&fakeService{}, "prompt", "render", "path-conflict", "tool", "--output", file)
+	if err == nil {
+		t.Fatal("existing prompt overwritten")
+	}
+}
+
+func TestQueryRefreshFlagAndSessionStreamScope(t *testing.T) {
+	f := &fakeService{}
+	_, _, err := invoke(f, "updates", "--manager", "gem", "--refresh", "--json")
+	if err != nil || !f.queries[0].Refresh {
+		t.Fatal(err, f.queries)
+	}
+	s := &sessionService{Service: f, ids: []string{"mise", "brew"}}
+	for range s.StreamQuery(context.Background(), domain.PackageQuery{Kind: "installed"}) {
+	}
+	if !reflect.DeepEqual(f.queries[1].Managers, s.ids) {
+		t.Fatal(f.queries)
+	}
+	if _, err = s.MaintenanceQueue(context.Background(), nil, true); err != nil || !reflect.DeepEqual(f.maintenanceIDs, s.ids) {
+		t.Fatal("interactive maintenance lost CLI scope", f.maintenanceIDs, err)
 	}
 }
 func TestManagerMaintenanceUsesExplicitApproval(t *testing.T) {

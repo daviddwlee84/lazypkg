@@ -13,20 +13,23 @@ import (
 )
 
 type Entry struct {
-	ID           string   `json:"id"`
-	BackendID    string   `json:"backend_id"`
-	Name         string   `json:"name"`
-	Requirement  string   `json:"requirement"`
-	Capabilities []string `json:"capabilities"`
-	Platforms    []string `json:"platforms"`
-	CLINames     []string `json:"cli_names"`
-	Keywords     []string `json:"keywords"`
-	Scope        string   `json:"scope"`
-	Groups       []string `json:"groups"`
-	Maintained   bool     `json:"maintained"`
-	Maintenance  string   `json:"maintenance"`
-	SourceURL    string   `json:"source_url"`
-	Reason       string   `json:"reason"`
+	ID             string   `json:"id"`
+	BackendID      string   `json:"backend_id"`
+	Name           string   `json:"name"`
+	Requirement    string   `json:"requirement"`
+	Capabilities   []string `json:"capabilities"`
+	Platforms      []string `json:"platforms"`
+	CLINames       []string `json:"cli_names"`
+	Keywords       []string `json:"keywords"`
+	Scope          string   `json:"scope"`
+	Groups         []string `json:"groups"`
+	Maintained     bool     `json:"maintained"`
+	Maintenance    string   `json:"maintenance"`
+	SourceURL      string   `json:"source_url"`
+	Reason         string   `json:"reason"`
+	ComponentKind  string   `json:"component_kind"`
+	VersionSubject string   `json:"version_subject"`
+	Launcher       string   `json:"launcher"`
 }
 
 //go:embed catalog.json

@@ -11,23 +11,27 @@ import (
 const MPMVersion = "8.0.1"
 
 type Manager struct {
-	ID           string         `json:"id"`
-	BackendID    string         `json:"backend_id,omitempty"`
-	Name         string         `json:"name"`
-	Path         string         `json:"path,omitempty"`
-	Version      string         `json:"version,omitempty"`
-	Supported    bool           `json:"supported"`
-	Available    bool           `json:"available"`
-	Status       string         `json:"status"`
-	Capabilities []string       `json:"capabilities"`
-	Errors       []string       `json:"errors,omitempty"`
-	Requirement  string         `json:"requirement,omitempty"`
-	Reason       string         `json:"reason,omitempty"`
-	Scope        string         `json:"scope,omitempty"`
-	Groups       []string       `json:"groups,omitempty"`
-	Maintained   bool           `json:"maintained"`
-	SourceURL    string         `json:"source_url,omitempty"`
-	Health       *ManagerHealth `json:"health,omitempty"`
+	ComponentKind  string         `json:"component_kind,omitempty"`
+	VersionSubject string         `json:"version_subject,omitempty"`
+	Launcher       string         `json:"launcher,omitempty"`
+	ReasonCode     string         `json:"reason_code,omitempty"`
+	ID             string         `json:"id"`
+	BackendID      string         `json:"backend_id,omitempty"`
+	Name           string         `json:"name"`
+	Path           string         `json:"path,omitempty"`
+	Version        string         `json:"version,omitempty"`
+	Supported      bool           `json:"supported"`
+	Available      bool           `json:"available"`
+	Status         string         `json:"status"`
+	Capabilities   []string       `json:"capabilities"`
+	Errors         []string       `json:"errors,omitempty"`
+	Requirement    string         `json:"requirement,omitempty"`
+	Reason         string         `json:"reason,omitempty"`
+	Scope          string         `json:"scope,omitempty"`
+	Groups         []string       `json:"groups,omitempty"`
+	Maintained     bool           `json:"maintained"`
+	SourceURL      string         `json:"source_url,omitempty"`
+	Health         *ManagerHealth `json:"health,omitempty"`
 }
 
 func (m Manager) Supports(op string) bool {
@@ -73,7 +77,7 @@ func (p Package) Key() string {
 	if p.Candidate {
 		return strings.Join([]string{p.Manager, p.Instance, NormalizePackageID(p.Manager, p.ID)}, "\x00")
 	}
-	return strings.Join([]string{p.Manager, p.ID, p.Version, p.Scope, p.Root}, "\x00")
+	return strings.Join([]string{p.Manager, p.Instance, NormalizePackageID(p.Manager, p.ID), p.Version, p.Scope}, "\x00")
 }
 
 type Issue struct {
@@ -82,6 +86,7 @@ type Issue struct {
 	Kind    string `json:"kind,omitempty"`
 }
 type Coverage struct {
+	Enrichment string    `json:"enrichment,omitempty"`
 	Manager    string    `json:"manager"`
 	Instance   string    `json:"instance,omitempty"`
 	State      string    `json:"state"` // complete, failed, unavailable, unsupported, excluded, pending
@@ -156,14 +161,15 @@ type Step struct {
 	GuideURL    string   `json:"guide_url,omitempty"`
 }
 type ActionPlan struct {
-	Kind          string         `json:"kind"`
-	Title         string         `json:"title"`
-	Request       ActionRequest  `json:"request"`
-	Steps         []Step         `json:"steps"`
-	Warnings      []string       `json:"warnings,omitempty"`
-	Preview       string         `json:"preview,omitempty"`
-	SetupIDs      []string       `json:"setup_ids,omitempty"`
-	ManagerUpdate *ManagerHealth `json:"manager_update,omitempty"`
+	Resolution    *ResolutionPlan `json:"resolution,omitempty"`
+	Kind          string          `json:"kind"`
+	Title         string          `json:"title"`
+	Request       ActionRequest   `json:"request"`
+	Steps         []Step          `json:"steps"`
+	Warnings      []string        `json:"warnings,omitempty"`
+	Preview       string          `json:"preview,omitempty"`
+	SetupIDs      []string        `json:"setup_ids,omitempty"`
+	ManagerUpdate *ManagerHealth  `json:"manager_update,omitempty"`
 }
 
 type ManagerPreferences struct {
@@ -175,6 +181,10 @@ type ManagerPreferences struct {
 	Mouse      bool                `json:"mouse"`
 }
 type ManagerHealth struct {
+	ComponentKind    string    `json:"component_kind,omitempty"`
+	VersionSubject   string    `json:"version_subject,omitempty"`
+	Launcher         string    `json:"launcher,omitempty"`
+	ReasonCode       string    `json:"reason_code,omitempty"`
 	Manager          string    `json:"manager"`
 	Path             string    `json:"path"`
 	Version          string    `json:"version"`
@@ -223,6 +233,11 @@ type SetupOption struct {
 // Service is the single user-facing operation boundary. Execute never confirms;
 // callers must present Plan and collect approval before passing it to Execute.
 type Service interface {
+	StreamQuery(context.Context, PackageQuery) <-chan QueryEvent
+	AssessConflict(context.Context, string) (ConflictAssessment, error)
+	PlanResolution(context.Context, ResolutionRequest) (ActionPlan, error)
+	MaintenanceQueue(context.Context, []string, bool) (MaintenanceQueue, error)
+	RenderPrompt(context.Context, PromptRequest) (RenderedPrompt, error)
 	Managers(context.Context) ([]Manager, error)
 	Query(context.Context, PackageQuery) (Snapshot, error)
 	Preferences(context.Context) (ManagerPreferences, error)

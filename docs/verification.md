@@ -1,5 +1,65 @@
 # Verification record
 
+## Unreleased workflows — 2026-09-25
+
+The implementation retains mpm 8.0.1 and was checked with the active mise Go
+1.27.0 environment. A login shell selected Homebrew Go 1.27.1 while retaining
+mise's GOROOT; checks therefore used the inherited, consistent environment.
+No shell configuration or toolchain installation was changed to run tests.
+
+The opt-in read-only profiling test records service events, not terminal paint
+times. It isolates Rustup settings and query caches:
+
+```sh
+LAZYPKG_BENCH_MPM=/absolute/path/to/mpm go test ./internal/app -run TestLiveProgressiveQueries -count=1 -v
+```
+
+| Query | First rows | First live rows | Complete |
+|---|---:|---:|---:|
+| Cold Installed (527 records) | 4.914 s | 4.914 s | 7.448 s |
+| Installed after reopening | 1 ms cached | 1.669 s | 3.700 s |
+| Cold Updates (252 records) | 2.307 s | 2.307 s | 19.638 s |
+| Updates after reopening | under 1 ms cached | 2.705 s | 21.918 s |
+
+Earlier aggregate-only CLI samples took 13.290 s for Installed and 22.050 s for
+Updates. These are local samples with varying native/network caches, not a
+controlled universal speedup claim. uv's configured PyPI mirror retried a failed
+request for about 20 seconds; progressive delivery lets other managers finish
+visibly while that failure remains isolated and reported.
+
+Race and fixture coverage checks fast-provider publication before a blocked
+provider, shared-work cancellation, complete base data before enrichment, disk
+seeds and empty replacement, cache invalidation, stable selection, component
+version identity, manager queue grouping, exact-prefix removal, and prompt
+render/export consistency. The real fake-service PTY additionally exercises
+guided removal, maintenance skip/recheck and prompt export, with three explicitly
+approved fake mutations and restored terminal state.
+
+Native conflict inspection identified two yt-dlp installations: uv tools and
+one Brew keg with two equivalent paths. Brew's copy is required by `summarize`,
+so that removal is blocked. Other observed cases include Brew/uv `thefuck` and
+`pre-commit`, and npm global commands in separate prefixes. Runtime coexistence
+and unresolved dispatchers remain distinct from removable duplicates.
+
+The actual CLI assessment showed two installations and grouped Brew's two paths.
+Two successive dry-run plans retaining Brew and removing uv were identical;
+prompt rendering preserved the `summarize` blocker. Neither plan was executed.
+
+The disposable npm resolution test passed using physically copied Node and npm
+with two private prefixes and a local fixture package. It checked read-only
+planning, dependency graph/impact assessment, an exact-prefix uninstall and
+retained-entrypoint verification. Original Node/npm/npmrc hashes were unchanged:
+
+```sh
+LAZYPKG_NATIVE_NPM_NODE=/absolute/path/to/copyable/node \
+LAZYPKG_NATIVE_NPM_CLI=/absolute/path/to/npm/bin/npm-cli.js \
+  go test ./internal/resolution -run TestNativeNPMDisposablePrefixes -count=1 -v
+```
+
+This requires a relocatable Node executable (the tested mise distribution works;
+copying only a Homebrew Node executable may miss its shared library). Native
+Homebrew/uv removals are covered by fixtures, not by removing user installations.
+
 ## v0.1.1 — 2026-09-25
 
 Local verification used macOS arm64, Go 1.27.0, mpm 8.0.1, uv 0.11.13 and

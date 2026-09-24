@@ -25,11 +25,11 @@ func (a *App) maintenanceEngine() *maintenance.Engine {
 	return a.maintenance
 }
 func (a *App) CheckManagers(ctx context.Context, ids []string, force bool) ([]domain.ManagerHealth, error) {
+	if ids != nil && len(ids) == 0 {
+		return nil, fmt.Errorf("select at least one manager; an empty explicit selection is not all managers")
+	}
 	if force {
-		a.cacheMu.Lock()
-		a.cacheEpoch++
-		a.managerCache = nil
-		a.cacheMu.Unlock()
+		a.invalidateDetection()
 	}
 	managers, err := a.Managers(ctx)
 	if err != nil {

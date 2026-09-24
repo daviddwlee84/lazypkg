@@ -64,3 +64,63 @@ func (f *ptyService) Execute(ctx context.Context, plan domain.ActionPlan, in io.
 	}
 	return result, err
 }
+
+func (f *ptyService) StreamQuery(ctx context.Context, request domain.PackageQuery) <-chan domain.QueryEvent {
+	events := make(chan domain.QueryEvent, 3)
+	go func() {
+		defer close(events)
+		snapshot, err := f.Query(ctx, request)
+		if err != nil {
+			return
+		}
+		coverage := domain.Coverage{Manager: "brew", State: "complete", ObservedAt: time.Now(), Enrichment: "pending"}
+		snapshot.Coverage = []domain.Coverage{coverage}
+		emit := func(event domain.QueryEvent) bool {
+			select {
+			case events <- event:
+				return true
+			case <-ctx.Done():
+				return false
+			}
+		}
+		if !emit(domain.QueryEvent{Stage: "base", Manager: "brew", Snapshot: domain.CloneSnapshot(snapshot), Elapsed: 300 * time.Millisecond}) {
+			return
+		}
+		timer := time.NewTimer(time.Second)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
+		snapshot.Coverage[0].Enrichment = "complete"
+		if !emit(domain.QueryEvent{Stage: "enriched", Manager: "brew", Snapshot: domain.CloneSnapshot(snapshot), Elapsed: 1300 * time.Millisecond}) {
+			return
+		}
+		emit(domain.QueryEvent{Stage: "done", Snapshot: snapshot})
+	}()
+	return events
+}
+
+func (f *ptyService) Diagnose(context.Context, string) (domain.DiagnosticReport, error) {
+	return domain.DiagnosticReport{Scope: "fixture PATH", Executables: []domain.Executable{{Name: "alpha", Path: "/fixture/brew/alpha", Manager: "brew", Preferred: true}, {Name: "alpha", Path: "/fixture/uv/alpha", Manager: "uv"}}, Findings: []domain.Finding{{Kind: "shadowed", Name: "alpha", Message: "Two fixture installations"}}}, nil
+}
+func (f *ptyService) AssessConflict(context.Context, string) (domain.ConflictAssessment, error) {
+	return domain.ConflictAssessment{Name: "alpha", Installations: []domain.ConflictInstallation{
+		{ID: "keep-brew", Package: domain.Package{Manager: "brew", ID: "alpha", Version: "1"}, Status: "ready", Project: "alpha", Effective: true, Paths: []domain.Executable{{Path: "/fixture/brew/alpha"}}},
+		{ID: "remove-uv", Package: domain.Package{Manager: "uv", ID: "alpha", Version: "1"}, Status: "ready", Project: "alpha", Paths: []domain.Executable{{Path: "/fixture/uv/alpha"}}, Commands: []string{"alpha"}},
+	}}, nil
+}
+func (f *ptyService) PlanResolution(ctx context.Context, request domain.ResolutionRequest) (domain.ActionPlan, error) {
+	assessment, _ := f.AssessConflict(ctx, request.Name)
+	return domain.ActionPlan{Title: "Remove one fixture installation", Request: domain.ActionRequest{Operation: "remove", Manager: "uv", Package: "alpha"}, Resolution: &domain.ResolutionPlan{Request: request, Keep: assessment.Installations[0], Remove: assessment.Installations[1]}}, nil
+}
+func (f *ptyService) MaintenanceQueue(context.Context, []string, bool) (domain.MaintenanceQueue, error) {
+	return domain.MaintenanceQueue{Jobs: []domain.MaintenanceJob{
+		{ID: "brew", Category: "update", Title: "Fixture Homebrew", Representative: "brew", ApplySupported: true},
+		{ID: "manual", Category: "guidance", Title: "Fixture manual owner", Representative: "uv", Reason: "Fixture instructions"},
+	}}, nil
+}
+func (f *ptyService) PlanManagerUpdate(context.Context, string) (domain.ActionPlan, error) {
+	return domain.ActionPlan{Title: "Update fixture manager", Kind: "manager-update", Request: domain.ActionRequest{Operation: "manager-update", Manager: "brew"}, ManagerUpdate: &domain.ManagerHealth{Manager: "brew", ApplySupported: true}}, nil
+}

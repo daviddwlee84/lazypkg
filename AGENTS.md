@@ -36,6 +36,20 @@ Windows and Linux. It uses mpm 8.0.1 subprocess JSON as its main package backend
 - Inventory caches expire at 60 seconds and manager health at 24 hours. Failed
   reads retain explicitly stale observations. Mutation invalidates generations
   so late reads cannot repopulate caches.
+- `StreamQuery` publishes whole-provider cache/base/enriched batches and a final
+  aggregate. `Query` collects that stream. Disk snapshots up to 24 hours old are
+  always unverified seeds; context/instance changes invalidate their identity.
+  Package keys exclude derived ownership roots so enrichment retains selection.
+- `resolution` assesses all removable global/user providers and implements
+  bound Brew/uv-tool/npm-prefix removal preflights. Exact entrypoint ownership
+  outranks runtime-root inference; reverse dependencies and uncertain effects
+  block guided removal. No force/cascade/autoremove, or parent-shell PATH edits.
+- `promptkit` separates typed context collection from pure Markdown rendering;
+  `promptio` copies/exports that exact payload. Prompts never launch an agent or
+  authorize a write, and contain no raw environment/configuration dumps.
+- Manager maintenance distinguishes the versioned component from its launcher.
+  Never offer upgrading zsh/Python/Neovim merely because an adapter uses it.
+  Queue writes remain individually approved and freshly planned.
 - `Plan` is read-only. `Execute` requires an already-reviewed plan. Keep manager
   and exact package identity explicit; do not use unscoped mpm mutations.
 - Adapter-generated pURLs protect native `@` IDs from mpm's version parser;
@@ -47,8 +61,8 @@ Windows and Linux. It uses mpm 8.0.1 subprocess JSON as its main package backend
   Runtime installation and global activation are separate operations.
 - WinGet recognition is not installer history. PATH collision is not proof of
   same-tool duplication; shim aliases and intentional runtime versions differ.
-- Default scope is global/user; no project/venv scans, usage tracking, cleanup
-  recommendations or automatic PATH repairs.
+- Default scope is global/user; no project/venv scans, usage tracking or automatic
+  PATH repairs. Guided removal is limited to explicitly selected conflicts.
 - Normal uv tool environment is the chosen default for mpm provisioning. Never
   install or remove real user software during generic tests; use fakes or a
   disposable child environment. Read-only local manager probes are appropriate.

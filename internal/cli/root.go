@@ -106,12 +106,15 @@ func (o *options) service() (domain.Service, error) {
 	if _, err := c.Select(o.query("installed", "")); err != nil {
 		return nil, usageError{err}
 	}
-	return app.New(c), nil
+	a := app.New(c)
+	a.Version = version()
+	return a, nil
 }
 func NewRoot() *cobra.Command { return newRoot(nil) }
 func newRoot(service domain.Service) *cobra.Command {
 	o := &options{override: service}
 	root := &cobra.Command{Use: "lazypkg", Short: "See, search and manage software across package managers", Version: version(), SilenceErrors: true, SilenceUsage: true, Args: cobra.NoArgs}
+	root.AddCommand(resolutionCommand(o), promptCommand(o))
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usageError{err} })
 	root.PersistentFlags().StringVar(&o.config, "config", "", "Path to TOML configuration")
 	root.PersistentFlags().StringVar(&o.mpm, "mpm", "", "Explicit mpm executable (tested version "+domain.MPMVersion+")")
@@ -167,6 +170,8 @@ func newRoot(service domain.Service) *cobra.Command {
 	for _, q := range []struct{ use, kind, desc string }{{"list [filter]", "installed", "List globally installed packages and tools"}, {"search <query>", "search", "Search available managers; uv tools use exact PyPI names"}, {"updates [filter]", "outdated", "List available updates"}} {
 		q := q
 		c := &cobra.Command{Use: q.use, Short: q.desc, Args: cobra.MaximumNArgs(1)}
+		var refresh bool
+		c.Flags().BoolVar(&refresh, "refresh", false, "Refresh provider observations instead of using memory cache")
 		if q.kind == "search" {
 			c.Args = cobra.ExactArgs(1)
 		}
@@ -179,7 +184,9 @@ func newRoot(service domain.Service) *cobra.Command {
 			if len(args) > 0 {
 				query = args[0]
 			}
-			v, err := s.Query(cmd.Context(), o.query(q.kind, query))
+			request := o.query(q.kind, query)
+			request.Refresh = refresh
+			v, err := s.Query(cmd.Context(), request)
 			if err != nil {
 				return err
 			}

@@ -19,6 +19,9 @@ GLOBAL = {
 }
 ENVIRONMENT = {"uv", "pip", "pip2", "pip3", "pipxu", "conda", "mamba", "micromamba", "pixi"}
 ECOSYSTEMS = {"pypi": "python", "npm": "node", "gem": "ruby", "cargo": "rust", "golang": "go", "deb": "debian", "rpm": "rpm", "alpm": "arch"}
+SHELL_COMPONENTS = {"antidote", "antigen", "fisher", "oh-my-fish", "zim", "zinit", "zplug"}
+HOSTED_COMPONENTS = {"lazy", "mason", "vim-pack", "emacs", "micro"}
+LAUNCHER_VERSION = {"vim-pack", "emacs", "micro"}
 
 
 def generate():
@@ -64,6 +67,9 @@ def generate():
             "maintenance": manager.unmaintained_message or manager.maintenance_note or "",
             "source_url": f"https://github.com/kdeldycke/meta-package-manager/blob/v{PIN}/meta_package_manager/managers/{filename}",
             "reason": reason,
+            "component_kind": "shell" if backend_id in SHELL_COMPONENTS else "hosted" if backend_id in HOSTED_COMPONENTS else "executable",
+            "version_subject": "launcher" if backend_id in LAUNCHER_VERSION else "component",
+            "launcher": manager.cli_names[0] if manager.cli_names else "",
         })
     entries.sort(key=lambda entry: entry["id"])
     artifact = {"schema_version": 1, "backend_version": PIN, "managers": entries}

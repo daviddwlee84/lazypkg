@@ -9,6 +9,19 @@ prepares a reviewable plan, and verifies installation state after mutation.
 Ownership enrichment is optional evidence and must not decide whether an
 installation succeeded. A manager read error is not an empty inventory.
 
+`StreamQuery` publishes whole-provider cache, base and enriched batches followed
+by one final aggregate. `Query` collects the same stream for CLI callers. Basic
+rows are usable before enrichment finishes; freshness is tracked per provider.
+TUI subscriptions consume one event per effect and reject superseded generations.
+Package identity includes manager instance/ID/version/scope, excluding derived
+roots so later ownership evidence cannot move selection to another row.
+
+Backend resolution, discovery and overlapping provider reads share cancellable
+work. Each consumer can unsubscribe independently; no consumers cancels the job.
+Package reads share a four-job limit and enrichment a three-job limit. Backend
+resolution performs native probes outside application-state locks. Explicit
+refresh rechecks the pinned backend and supersedes the relevant cache epoch.
+
 `domain.PackageQuery` is the CLI/TUI selection contract. An explicit manager
 list, built-in group or saved ordered set selects providers; environment and
 unknown scopes are excluded from package operations. `internal/catalog` embeds
@@ -19,7 +32,11 @@ Public `uv` aliases `uvx`; `uv-pip` names mpm's environment-specific `uv` adapte
 
 Inventory coverage records complete/failed/unavailable/unsupported/excluded
 states, manager instance and observation time. The service caches inventory for
-60 seconds and detection for five seconds. Mutations invalidate a cache epoch;
+60 seconds for Installed/Updates and detection for five seconds. Complete
+provider batches can also seed startup from a private disk cache up to 24 hours
+old. Disk seeds are always stale until live validation; context fingerprints
+include platform, cwd, PATH and provider namespace environment settings, with
+only the hash persisted. Mutations invalidate memory and disk query data;
 request timestamps prevent older concurrent reads from overwriting newer ones.
 Discover matches provider + normalized package ID + instance, retaining all
 installed versions without comparing them to the remote version. Same-name PATH
@@ -71,6 +88,27 @@ The recipe is enabled on macOS/Linux; Windows npm gets guidance. Other recipes
 require owner evidence, such as Homebrew formula paths plus metadata or a uv
 standalone receipt; Cargo/rustup proxies and recognized package records alone
 are not ownership proof.
+
+`internal/resolution` groups aliases into installation instances and assesses
+retention/removal of a focused command. Exact registered entrypoints outrank
+runtime containment. Runtime coexistence and unresolved dispatchers remain
+distinct from removable application duplicates. Guided removal currently has
+reviewed Brew formula, uv tool and POSIX npm-prefix preflights; other removable
+providers expose guidance. A plan binds both installations, dependencies, all
+affected commands and expected PATH result. Transient inventory timestamps do
+not enter operation identity. Execute reconstructs the plan, compares it, runs
+one exact removal and verifies the retained/removed records and entrypoints.
+Generic package plans also reject failed/stale selected-provider inventory.
+
+Manager metadata identifies the component and the launcher separately. Hosted
+plugins cannot become host-upgrade plans. The maintenance queue merges only
+proven equivalent update targets and obtains a new plan for every individually
+approved operation; native completion does not authorize the next item.
+
+`internal/promptkit` collects typed evidence once and renders a versioned context
+plus advisory Markdown. Data strings are serialized without recursive template
+evaluation. `internal/promptio` copies or exports those exact rendered bytes;
+neither subsystem invokes an agent or accepts generated instructions as commands.
 
 Configuration saves preserve unrelated TOML content and file permissions, with
 digest checks, a cooperative lock and atomic replacement. Mouse hit targets

@@ -41,6 +41,8 @@ type viewState struct {
 	loaded           bool
 	stale            bool
 	force            bool
+	streaming        bool
+	providers        map[string]providerState
 	retainedManagers map[string]bool
 	err              error
 }
@@ -58,6 +60,10 @@ const (
 	issuesModal
 	providersModal
 	saveSetModal
+	resolutionModal
+	maintenanceModal
+	promptModal
+	exportPromptModal
 )
 
 type setupState struct {
@@ -131,6 +137,7 @@ type Model struct {
 	status             string
 	pendingG           bool
 	quitting           bool
+	workflow           workflowState
 }
 
 type packagesMsg struct {
@@ -193,9 +200,16 @@ func New(ctx context.Context, service domain.Service, initialView string, option
 		m.view = diagnosticsView
 	case "managers":
 		m.view = managersView
+	case "maintenance", "maintenance:refresh":
+		m.view = managersView
+		m.workflow.initial = initialView
 	case "setup":
 		m.view = managersView
 		m.startSetup = true
+	}
+	if strings.HasPrefix(initialView, "resolve:") {
+		m.view = diagnosticsView
+		m.workflow.initial = initialView
 	}
 	return m
 }
@@ -210,7 +224,11 @@ func Run(ctx context.Context, service domain.Service, initialView string, option
 
 func (m *Model) Init() tea.Cmd {
 	commands := []tea.Cmd{m.loadManagers(), m.loadPreferences()}
-	if m.startSetup {
+	if strings.HasPrefix(m.workflow.initial, "maintenance") {
+		commands = append(commands, m.openMaintenance(strings.HasSuffix(m.workflow.initial, ":refresh")))
+	} else if strings.HasPrefix(m.workflow.initial, "resolve:") {
+		commands = append(commands, m.loadConflict(strings.TrimPrefix(m.workflow.initial, "resolve:")))
+	} else if m.startSetup {
 		m.modal = setupModal
 		commands = append(commands, m.loadSetup())
 	} else if m.view != managersView {
@@ -279,10 +297,8 @@ func (m *Model) loadView(view viewID) tea.Cmd {
 	}
 	request := domain.PackageQuery{Kind: kind, Query: query, Managers: m.effectiveManagers(), DeferInventory: view == discoverView, Refresh: s.force}
 	s.force = false
-	command := func() tea.Msg {
-		snapshot, err := service.Query(ctx, request)
-		return packagesMsg{view, generation, query, snapshot, err}
-	}
+	m.beginViewStream(view)
+	command := m.startStream(ctx, request, streamTarget{view: view, generation: generation, query: query})
 	if view == discoverView {
 		return tea.Batch(command, m.ensureInventory(false))
 	}
@@ -294,10 +310,26 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.mouseMessage(message)
 	}
 	switch message.(type) {
-	case tea.WindowSizeMsg, tea.KeyPressMsg, tea.PasteMsg, managersMsg, packagesMsg, diagnosticsMsg, setupMsg, planMsg, executedMsg, preferencesMsg, inventoryMsg, healthMsg, savedSetMsg:
+	case tea.WindowSizeMsg, tea.KeyPressMsg, tea.PasteMsg, managersMsg, packagesMsg, diagnosticsMsg, setupMsg, planMsg, executedMsg, preferencesMsg, inventoryMsg, healthMsg, savedSetMsg, streamStartedMsg, streamEventMsg, conflictMsg, maintenanceMsg, promptMsg, promptIOResultMsg:
 		m.invalidateMouse()
 	}
 	switch msg := message.(type) {
+	case streamStartedMsg:
+		return m, m.acceptStreamStart(msg)
+	case streamEventMsg:
+		return m, m.acceptStreamEvent(msg)
+	case conflictMsg:
+		m.acceptConflict(msg)
+		return m, nil
+	case maintenanceMsg:
+		m.acceptMaintenance(msg)
+		return m, nil
+	case promptMsg:
+		m.acceptPrompt(msg)
+		return m, nil
+	case promptIOResultMsg:
+		m.acceptPromptIO(msg)
+		return m, nil
 	case preferencesMsg:
 		return m, m.acceptPreferences(msg)
 	case inventoryMsg:
@@ -351,7 +383,7 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.generation != s.generation {
 			return m, nil
 		}
-		s.loading, s.err = false, msg.err
+		s.loading, s.err, s.streaming = false, msg.err, false
 		if msg.err == nil {
 			snapshot := domain.CloneSnapshot(msg.snapshot)
 			s.retainedManagers = nil
@@ -427,12 +459,13 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "Operation failed or stopped; review its result with v."
 		}
 		for i := range m.states {
-			if m.states[i].loaded {
-				m.states[i].stale = true
-			}
+			m.cancelView(viewID(i))
 		}
 		m.setup.loaded = false
 		m.invalidateInventories()
+		if cmd, handled := m.afterWorkflowExecution(msg); handled {
+			return m, cmd
+		}
 		commands := []tea.Cmd{m.loadManagers()}
 		if m.view != managersView {
 			commands = append(commands, m.loadView(m.view))
@@ -442,7 +475,7 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if m.executing {
 			return m, nil
 		}
-		if msg.String() == "M" && !m.filtering && m.modal != versionModal && m.modal != saveSetModal {
+		if msg.String() == "M" && !m.filtering && m.modal != versionModal && m.modal != saveSetModal && m.modal != exportPromptModal {
 			return m, m.navigationKey(msg)
 		}
 		if m.modal != noModal {
@@ -454,12 +487,12 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.navigationKey(msg)
 	case tea.PasteMsg:
 		// Bracketed paste never falls through into navigation or approval.
-		if m.filtering || m.modal == versionModal || m.modal == saveSetModal {
+		if m.filtering || m.modal == versionModal || m.modal == saveSetModal || m.modal == exportPromptModal {
 			return m, m.inputMessage(msg)
 		}
 		return m, nil
 	default:
-		if m.filtering || m.modal == versionModal || m.modal == saveSetModal {
+		if m.filtering || m.modal == versionModal || m.modal == saveSetModal || m.modal == exportPromptModal {
 			var cmd tea.Cmd
 			m.input, cmd = m.input.Update(message)
 			return m, cmd
@@ -469,6 +502,9 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) inputMessage(message tea.Msg) tea.Cmd {
+	if m.modal == exportPromptModal {
+		return m.exportInput(message)
+	}
 	if m.modal == saveSetModal {
 		return m.saveSetInput(message)
 	}
@@ -537,6 +573,12 @@ func (m *Model) navigationKey(key tea.KeyPressMsg) tea.Cmd {
 		m.pendingG = false
 	}
 	switch name {
+	case "R":
+		return m.startConflict()
+	case "U":
+		return m.openMaintenance()
+	case "p":
+		return m.openPrompt()
 	case "M":
 		m.mouseEnabled = !m.mouseEnabled
 		m.mouseOverride = true
@@ -761,11 +803,13 @@ func (m *Model) cancelView(view viewID) {
 		s.cancel()
 	}
 	s.generation++
+	s.streaming = false
 	s.loading = false
 	s.stale = s.loaded
 }
 
 func (m *Model) cancelAll() {
+	m.cancelWorkflow()
 	for i := range m.states {
 		m.cancelView(viewID(i))
 	}
@@ -868,7 +912,7 @@ func (m *Model) rows(view viewID) []row {
 			if view == updatesView {
 				version += " → " + orUnknown(p.Latest)
 			}
-			if s.retainedManagers[p.Manager] {
+			if s.retainedManagers[p.Manager] || p.InventoryStale {
 				version += " (stale)"
 			}
 			rows = append(rows, row{key: p.Key(), label: p.ID, secondary: version, manager: p.Manager, pkg: p})
@@ -950,12 +994,34 @@ func retainFailedProviders(previous, fresh domain.Snapshot) (domain.Snapshot, ma
 			failed[issue.Manager] = true
 		}
 	}
+	for _, coverage := range fresh.Coverage {
+		failed[coverage.Manager] = coverage.State == "failed" && !present[coverage.Manager]
+	}
 	retained := make(map[string]bool)
 	for _, p := range previous.Packages {
-		if failed[p.Manager] {
+		if failed[p.Manager] && !providerInstanceChanged(previous, fresh, p.Manager) {
+			p.InventoryStale = true
 			fresh.Packages = append(fresh.Packages, p)
 			retained[p.Manager] = true
 		}
 	}
 	return fresh, retained
+}
+
+func providerInstanceChanged(previous, fresh domain.Snapshot, id string) bool {
+	instance := func(s domain.Snapshot) string {
+		for _, c := range s.Coverage {
+			if c.Manager == id && c.Instance != "" {
+				return c.Instance
+			}
+		}
+		for _, p := range s.Packages {
+			if p.Manager == id && p.Instance != "" {
+				return p.Instance
+			}
+		}
+		return ""
+	}
+	old, next := instance(previous), instance(fresh)
+	return old != "" && next != "" && old != next
 }

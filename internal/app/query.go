@@ -51,20 +51,30 @@ func (a *App) Managers(ctx context.Context) ([]domain.Manager, error) {
 		return out, nil
 	}
 	a.cacheMu.Unlock()
-	m, err := a.provider(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out, err := m.Managers(ctx)
-	if err == nil {
-		a.cacheMu.Lock()
-		if epoch == a.cacheEpoch && !a.managerCacheAt.After(observedAt) {
-			a.managerCache = append([]domain.Manager(nil), out...)
-			a.managerCacheAt = observedAt
+	out, err := a.managerJobs.do(ctx, fmt.Sprint(epoch), func(work context.Context) ([]domain.Manager, error) {
+		m, err := a.provider(work)
+		if err != nil {
+			return nil, err
 		}
-		a.cacheMu.Unlock()
-	}
-	return out, err
+		out, err := m.Managers(work)
+		if err != nil {
+			a.mu.Lock()
+			if a.mpm == m {
+				a.mpm = nil
+			}
+			a.mu.Unlock()
+		}
+		if err == nil && work.Err() == nil {
+			a.cacheMu.Lock()
+			if epoch == a.cacheEpoch && !a.managerCacheAt.After(observedAt) {
+				a.managerCache = append([]domain.Manager(nil), out...)
+				a.managerCacheAt = observedAt
+			}
+			a.cacheMu.Unlock()
+		}
+		return out, err
+	})
+	return append([]domain.Manager(nil), out...), err
 }
 func (a *App) mise() (backend.Mise, error) {
 	p, err := a.Bootstrap.Lookup("mise")
@@ -77,13 +87,30 @@ func instance(m domain.Manager) string {
 	return m.Path
 }
 func inventoryKey(m domain.Manager) string { return m.ID + "\x00" + instance(m) + "\x00" + m.Version }
+
+func (a *App) invalidateDetection() {
+	a.mu.Lock()
+	a.cacheMu.Lock()
+	a.cacheEpoch++
+	a.managerCache = nil
+	a.mpm = nil
+	a.cacheMu.Unlock()
+	a.mu.Unlock()
+}
 func (a *App) invalidateInventory() {
+	a.diskMu.Lock()
+	defer a.diskMu.Unlock()
+	a.mu.Lock()
+	a.mpm = nil
 	a.cacheMu.Lock()
 	a.cacheEpoch++
 	a.inventory = nil
+	a.updateCache = nil
 	a.managerCache = nil
 	a.managerCacheAt = time.Time{}
 	a.cacheMu.Unlock()
+	a.mu.Unlock()
+	a.clearQueryDisk()
 }
 func (a *App) cached(m domain.Manager, freshOnly bool) (domain.Snapshot, bool) {
 	a.cacheMu.Lock()
@@ -128,12 +155,9 @@ func (a *App) packages(ctx context.Context, kind, query, manager string, enrich 
 	return a.read(ctx, q, enrich, false)
 }
 
-func (a *App) Query(ctx context.Context, q domain.PackageQuery) (domain.Snapshot, error) {
+func (a *App) searchQuery(ctx context.Context, q domain.PackageQuery) (domain.Snapshot, error) {
 	if q.Refresh {
-		a.cacheMu.Lock()
-		a.cacheEpoch++
-		a.managerCache = nil
-		a.cacheMu.Unlock()
+		a.invalidateDetection()
 	}
 	s, err := a.read(ctx, q, q.Kind == "installed", q.Kind == "installed" && !q.Refresh)
 	if err != nil {
@@ -168,7 +192,7 @@ func (a *App) Query(ctx context.Context, q domain.PackageQuery) (domain.Snapshot
 			inventory.Coverage = append(inventory.Coverage, domain.Coverage{Manager: id, Instance: instance(m), State: "pending"})
 		}
 	} else {
-		inventory, err = a.read(ctx, domain.PackageQuery{Kind: "installed", Managers: ids, Refresh: q.Refresh}, true, !q.Refresh)
+		inventory, err = a.Query(ctx, domain.PackageQuery{Kind: "installed", Managers: ids, Refresh: q.Refresh})
 		if err != nil {
 			if ctx.Err() != nil {
 				return s, ctx.Err()
@@ -283,7 +307,8 @@ func (a *App) read(ctx context.Context, q domain.PackageQuery, enrich, useCache 
 		err error
 	}
 	ch := make(chan reply, len(targets))
-	limit := make(chan struct{}, 4)
+	a.limits()
+	limit := a.querySem
 	for _, m := range targets {
 		go func(m domain.Manager) {
 			select {

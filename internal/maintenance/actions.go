@@ -21,6 +21,12 @@ func (e *Engine) Plan(ctx context.Context, manager domain.Manager) (domain.Actio
 	return e.plan(results[0]), nil
 }
 func (e *Engine) plan(h domain.ManagerHealth) domain.ActionPlan {
+	if hostedComponent(h) {
+		h.ApplySupported = false
+		if h.Recommendation == "" {
+			h.Recommendation = "Inspect the hosted component separately from its launcher; no verified component update recipe is available."
+		}
+	}
 	h.Fingerprint = hash([]string{h.Fingerprint, h.Strategy, h.CandidateVersion})
 	p := domain.ActionPlan{Kind: "manager", Title: "Update selected " + h.Manager, Request: domain.ActionRequest{Operation: "manager-update", Manager: h.Manager, Version: h.CandidateVersion}, ManagerUpdate: &h}
 	if !h.ApplySupported {
@@ -84,10 +90,10 @@ func (e *Engine) Execute(ctx context.Context, plan domain.ActionPlan, in io.Read
 		return r, errors.New("not a manager maintenance plan")
 	}
 	h := *plan.ManagerUpdate
-	if !h.ApplySupported || h.Fingerprint == "" {
+	if !h.ApplySupported || h.Fingerprint == "" || hostedComponent(h) {
 		return r, errors.New("this manager has guidance only; no update recipe was approved")
 	}
-	m := domain.Manager{ID: h.Manager, Path: h.Path, Version: h.Version, Requirement: h.Requirement, Available: h.Compatible}
+	m := domain.Manager{ID: h.Manager, Path: h.Path, Version: h.Version, Requirement: h.Requirement, Available: h.Compatible, Reason: h.Reason, ReasonCode: h.ReasonCode, ComponentKind: h.ComponentKind, VersionSubject: h.VersionSubject, Launcher: h.Launcher}
 	if selected := e.lookup(executableName(h.Manager)); selected != "" && canonical(selected) != canonical(h.Path) {
 		return r, errors.New("the selected manager on PATH changed; review a new update plan")
 	}
@@ -262,6 +268,9 @@ func (e *Engine) installedNPM(ctx context.Context, h domain.ManagerHealth) (stri
 }
 
 func (e *Engine) managerVersion(ctx context.Context, h domain.ManagerHealth) (string, error) {
+	if h.Manager == "go" {
+		return e.query(ctx, h.Path, "version")
+	}
 	if h.Strategy == "scoop-update" {
 		ps := e.lookup("pwsh")
 		if ps == "" {

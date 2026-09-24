@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Stream Installed/Updates provider batches before slow queries and ownership
+  enrichment finish; share in-flight work and seed marked stale disk snapshots.
+- Add guided conflict assessment and bound removals for Brew formulae, uv tools
+  and npm prefixes, including dependencies and retained-entrypoint verification.
+- Add a per-job manager maintenance queue and distinguish component failures
+  from host launchers; fix Yazi's multiline version probe.
+- Generate versioned advisory prompts with preview, clipboard and private file
+  export, using the same immutable context.
+- Strengthen exact entrypoint attribution, instance-safe stale retention,
+  mutation cancellation and Homebrew scoped-removal behavior.
+
 ## v0.1.1 — 2026-09-25
 
 - Detect the full pinned mpm catalog, with requirements, capabilities and scope;
