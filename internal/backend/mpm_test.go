@@ -5,15 +5,109 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/daviddwlee84/lazypkg/internal/catalog"
 	"github.com/daviddwlee84/lazypkg/internal/domain"
 	"github.com/daviddwlee84/lazypkg/internal/process"
 )
 
 type fakeRunner struct {
 	output func(domain.Command) (process.Result, error)
+}
+
+func TestFullManagerDiscoveryMergesGeneratedMetadata(t *testing.T) {
+	m := MPM{Path: "mpm", Runner: fakeRunner{output: func(c domain.Command) (process.Result, error) {
+		if reflect.DeepEqual(c.Args, []string{"--version"}) {
+			return process.Result{Stdout: "mpm, version 8.0.1"}, nil
+		}
+		args := strings.Join(c.Args, " ")
+		if !strings.Contains(args, "--table-format json managers --view all") || strings.Contains(args, "--brew") {
+			t.Fatalf("discovery restricted to old core: %s", args)
+		}
+		return process.Result{Stdout: `{"npm":{"id":"npm","supported":true,"available":false,"executable":true,"fresh":false,"version":"11.6.2","cli_path":"/mise/node/bin/npm"},"go":{"id":"go","supported":true,"available":true,"executable":true,"fresh":true,"version":"1.26.0","cli_path":"/go/bin/go"},"uv":{"id":"uv","supported":true,"available":true,"executable":true,"fresh":true,"version":"0.11.0","cli_path":"/bin/uv"},"uvx":{"id":"uvx","supported":true,"available":true,"executable":true,"fresh":true,"version":"0.11.0","cli_path":"/bin/uv"},"winget":{"id":"winget","supported":false}}`}, nil
+	}}}
+	managers, err := m.Managers(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]domain.Manager{}
+	for _, v := range managers {
+		byID[v.ID] = v
+	}
+	if len(managers) != 4 {
+		t.Fatalf("managers: %+v", managers)
+	}
+	npm := byID["npm"]
+	if npm.Status != "version unsupported" || npm.Requirement != ">=11.10.0" || !strings.Contains(npm.Reason, "min-release-age") {
+		t.Fatal(npm)
+	}
+	goManager := byID["go"]
+	if goManager.Scope != "global" || goManager.Supports("search") || goManager.Supports("upgrade") || !goManager.Supports("install") {
+		t.Fatal(goManager)
+	}
+	if byID["uv-pip"].BackendID != "uv" || byID["uv-pip"].Scope != "environment" || byID["uvx"].Scope != "global" || !byID["uvx"].Supports("search") {
+		t.Fatalf("uv collision: %+v", byID)
+	}
+	if len(Core) != len(catalog.All()) || !slices.Contains(Core, "gem") || !slices.Contains(Core, "rustup") {
+		t.Fatal("Core not generated")
+	}
+}
+
+func TestUnmaintainedInstalledManagerRemainsVisible(t *testing.T) {
+	m := MPM{Path: "mpm", Runner: fakeRunner{output: func(c domain.Command) (process.Result, error) {
+		if reflect.DeepEqual(c.Args, []string{"--version"}) {
+			return process.Result{Stdout: "mpm, version 8.0.1"}, nil
+		}
+		if !strings.Contains(strings.Join(c.Args, " "), "managers --view all") {
+			t.Fatal("unmaintained adapters hidden by discovery")
+		}
+		return process.Result{Stdout: `{"volta":{"id":"volta","supported":true,"available":true,"executable":true,"fresh":true,"version":"2.0.2","cli_path":"/tools/volta"},"winget":{"id":"winget","supported":false,"available":false}}`}, nil
+	}}}
+	managers, err := m.Managers(context.Background())
+	if err != nil || len(managers) != 1 {
+		t.Fatal(managers, err)
+	}
+	if managers[0].ID != "volta" || managers[0].Maintained || managers[0].Scope != "unknown" || !managers[0].Available {
+		t.Fatal(managers[0])
+	}
+	if slices.Contains(catalog.DefaultIDs(), "volta") {
+		t.Fatal("unmaintained adapter enabled by default")
+	}
+}
+
+func TestUVPipWireIdentityAndScope(t *testing.T) {
+	m := MPM{Path: "mpm", Runner: fakeRunner{output: func(c domain.Command) (process.Result, error) {
+		if reflect.DeepEqual(c.Args, []string{"--version"}) {
+			return process.Result{Stdout: "mpm, version 8.0.1"}, nil
+		}
+		if !strings.Contains(strings.Join(c.Args, " "), "--uv installed") {
+			t.Fatalf("wrong backend flag: %v", c.Args)
+		}
+		return process.Result{Stdout: `{"uv":{"packages":[{"id":"httpx","installed_version":"1.0"}],"errors":[]}}`}, nil
+	}}}
+	s, err := m.Packages(context.Background(), "installed", "", "uv-pip")
+	if err != nil || len(s.Packages) != 1 || s.Packages[0].Manager != "uv-pip" || s.Packages[0].Scope != "environment" {
+		t.Fatal(s, err)
+	}
+	if got := Specifier("uv-pip", "httpx"); got != "pkg:uv/httpx" {
+		t.Fatal(got)
+	}
+	if got := Specifier("uv", "httpx"); got != "pkg:uvx/httpx" {
+		t.Fatal(got)
+	}
+	c, cleanup, err := m.Mutation(domain.ActionRequest{Manager: "uv-pip", Operation: "install", Package: "httpx"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	if !strings.Contains(strings.Join(c.Args, " "), "--uv install -- pkg:uv/httpx") {
+		t.Fatal(c.Args)
+	}
 }
 
 func (f fakeRunner) Output(_ context.Context, c domain.Command) (process.Result, error) {
@@ -41,6 +135,86 @@ func TestWinGetRecognitionIsNotInstallerProof(t *testing.T) {
 	}
 }
 
+func TestGoBuildMetadataIsNotInstallerProof(t *testing.T) {
+	s, err := Decode([]byte(`{"go":{"packages":[{"id":"example.org/cmd/tool","installed_version":"v1.0.0"}],"errors":[]}}`), "go")
+	if err != nil || len(s.Packages) != 1 || s.Packages[0].Evidence[0].Kind != "recognized" || !strings.Contains(s.Packages[0].Evidence[0].Detail, "original installer is unknown") {
+		t.Fatal(s, err)
+	}
+}
+
+func TestReadOnlyQueriesDisableMiseAutoInstallation(t *testing.T) {
+	original := map[string]string{"MISE_AUTO_INSTALL": "1", "MISE_NOT_FOUND_AUTO_INSTALL": "true", "GEM_HOME": "/chosen/gems", "GOTOOLCHAIN": "go1.29+auto"}
+	queries := 0
+	m := MPM{Path: "mpm", Env: original, Runner: fakeRunner{output: func(c domain.Command) (process.Result, error) {
+		queries++
+		if c.Env["MISE_AUTO_INSTALL"] != "0" || c.Env["MISE_NOT_FOUND_AUTO_INSTALL"] != "false" || c.Env["GEM_HOME"] != "/chosen/gems" || c.Env["GOTOOLCHAIN"] != "local" {
+			t.Fatalf("unsafe query environment: %+v", c.Env)
+		}
+		if reflect.DeepEqual(c.Args, []string{"--version"}) {
+			return process.Result{Stdout: "mpm, version 8.0.1"}, nil
+		}
+		if !strings.Contains(strings.Join(c.Args, " "), "--timeout 5 --table-format json managers --view all") {
+			t.Fatal(c.Args)
+		}
+		b, err := os.ReadFile(c.Args[1])
+		if err != nil || !strings.Contains(string(b), `"version_cli_options":["version"]`) {
+			t.Fatalf("Go probe not corrected: %s %v", b, err)
+		}
+		return process.Result{Stdout: `{"go":{"id":"go","supported":true,"available":true,"executable":true,"fresh":true,"version":"1.27.0","cli_path":"/go"},"npm":{"id":"npm","supported":true,"available":false,"executable":true,"fresh":false,"cli_path":"/slow/npm","errors":["Timed out after 5s."]}}`}, nil
+	}}}
+	rows, err := m.Managers(context.Background())
+	if err != nil || len(rows) != 2 || queries != 2 {
+		t.Fatal(rows, err, queries)
+	}
+	if original["MISE_AUTO_INSTALL"] != "1" {
+		t.Fatal("caller environment was mutated")
+	}
+	mutation, cleanup, err := m.Mutation(domain.ActionRequest{Manager: "go", Operation: "install", Package: "example.com/tool"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	if mutation.Env["GOTOOLCHAIN"] != "go1.29+auto" || mutation.Env["MISE_AUTO_INSTALL"] != "1" {
+		t.Fatal("query isolation leaked into mutation", mutation.Env)
+	}
+	for _, row := range rows {
+		if row.ID == "npm" && (row.Available || len(row.Errors) != 1) {
+			t.Fatal("per-manager probe failure discarded", row)
+		}
+	}
+}
+
+func TestProbeTimeoutRespectsShortOuterDeadline(t *testing.T) {
+	for _, tc := range []struct {
+		outer time.Duration
+		want  int
+	}{{0, 5}, {30 * time.Second, 5}, {4 * time.Second, 2}, {time.Second, 1}} {
+		m := MPM{Timeout: tc.outer}
+		if got := m.probeTimeoutSeconds(); got != tc.want {
+			t.Fatalf("%v: %d", tc.outer, got)
+		}
+	}
+}
+
+func TestNativeMiseReadsGuardAutoinstallWithoutChangingMutations(t *testing.T) {
+	env := map[string]string{"MISE_AUTO_INSTALL": "true", "MISE_ENV": "work"}
+	m := Mise{Path: "mise", Env: env, Runner: fakeRunner{output: func(c domain.Command) (process.Result, error) {
+		if c.Env["MISE_AUTO_INSTALL"] != "0" || c.Env["MISE_NOT_FOUND_AUTO_INSTALL"] != "false" || c.Env["MISE_ENV"] != "work" || c.Env["GOTOOLCHAIN"] != "local" {
+			t.Fatal(c.Env)
+		}
+		return process.Result{Stdout: "{}"}, nil
+	}}}
+	if _, err := m.output(context.Background(), "ls", "--json"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.globalOutput(context.Background(), "ls", "--global", "--json"); err != nil {
+		t.Fatal(err)
+	}
+	if c := m.Command("install", "node@24"); c.Env["MISE_AUTO_INSTALL"] != "true" {
+		t.Fatal("mutation environment was overridden", c.Env)
+	}
+}
+
 func TestUVXEntrypointParserArtifactIsNotAPackage(t *testing.T) {
 	s, err := Decode([]byte(`{"uvx":{"packages":[{"id":"visidata","installed_version":"3.3"},{"id":"-","installed_version":"isidata"},{"id":"-","installed_version":"d"}]}}`), "uvx")
 	if err != nil || len(s.Packages) != 1 || s.Packages[0].ID != "visidata" {
@@ -58,7 +232,7 @@ func TestMPMContractAndTemporaryConfig(t *testing.T) {
 		}
 		configPath = c.Args[1]
 		b, err := os.ReadFile(configPath)
-		if err != nil || string(b) != `{"mpm":{}}` {
+		if err != nil || string(b) != isolatedConfig {
 			t.Fatalf("bad config %q %v", b, err)
 		}
 		args := strings.Join(c.Args, " ")

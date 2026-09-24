@@ -27,6 +27,8 @@ var viewNames = []string{"Installed", "Discover", "Updates", "Diagnostics", "Man
 
 type viewState struct {
 	snapshot         domain.Snapshot
+	candidates       domain.Snapshot
+	scopeKey         string
 	report           domain.DiagnosticReport
 	query            string
 	acceptedQuery    string
@@ -38,6 +40,7 @@ type viewState struct {
 	loading          bool
 	loaded           bool
 	stale            bool
+	force            bool
 	retainedManagers map[string]bool
 	err              error
 }
@@ -53,6 +56,8 @@ const (
 	versionModal
 	resultModal
 	issuesModal
+	providersModal
+	saveSetModal
 )
 
 type setupState struct {
@@ -76,6 +81,27 @@ type Model struct {
 	height             int
 	managerFocus       bool
 	managerFilter      string
+	managerIDs         []string
+	scopeName          string
+	scopeChanged       bool
+	preferences        domain.ManagerPreferences
+	prefsLoaded        bool
+	prefsErr           error
+	prefsGeneration    uint64
+	prefsCancel        context.CancelFunc
+	providerPicker     providerPicker
+	inventories        map[string]*inventoryState
+	mouseEnabled       bool
+	mouseOverride      bool
+	mouseEpoch         uint64
+	mousePressed       *pressedTarget
+	showAllManagers    bool
+	healthGeneration   uint64
+	healthCancel       context.CancelFunc
+	healthLoading      bool
+	healthForcePending bool
+	healthErr          error
+	setGeneration      uint64
 	diagnosticName     string
 	managerCursor      int
 	managers           []domain.Manager
@@ -89,6 +115,7 @@ type Model struct {
 	modal              modalKind
 	modalOffset        int
 	detailKey          string
+	detailOffset       int
 	setup              setupState
 	startSetup         bool
 	plan               domain.ActionPlan
@@ -140,14 +167,22 @@ type executedMsg struct {
 }
 
 // New constructs a dashboard without probing the machine or network.
-func New(ctx context.Context, service domain.Service, initialView string) *Model {
+type Options struct{ Mouse *bool }
+
+func New(ctx context.Context, service domain.Service, initialView string, options ...Options) *Model {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	input := textinput.New()
 	input.CharLimit = 512
 	input.SetWidth(60)
-	m := &Model{ctx: ctx, service: service, width: 80, height: 24, input: input}
+	m := &Model{ctx: ctx, service: service, width: 80, height: 24, input: input, scopeName: "Default", mouseEnabled: true, inventories: make(map[string]*inventoryState)}
+	for _, option := range options {
+		if option.Mouse != nil {
+			m.mouseEnabled = *option.Mouse
+			m.mouseOverride = true
+		}
+	}
 	m.setup.selected = make(map[string]bool)
 	switch strings.ToLower(initialView) {
 	case "discover", "search":
@@ -166,15 +201,15 @@ func New(ctx context.Context, service domain.Service, initialView string) *Model
 }
 
 // Run owns the terminal until the dashboard is closed.
-func Run(ctx context.Context, service domain.Service, initialView string) error {
-	m := New(ctx, service, initialView)
+func Run(ctx context.Context, service domain.Service, initialView string, options ...Options) error {
+	m := New(ctx, service, initialView, options...)
 	defer m.cancelAll()
 	_, err := tea.NewProgram(m, tea.WithContext(m.ctx)).Run()
 	return err
 }
 
 func (m *Model) Init() tea.Cmd {
-	commands := []tea.Cmd{m.loadManagers()}
+	commands := []tea.Cmd{m.loadManagers(), m.loadPreferences()}
 	if m.startSetup {
 		m.modal = setupModal
 		commands = append(commands, m.loadSetup())
@@ -199,6 +234,7 @@ func (m *Model) loadManagers() tea.Cmd {
 
 func (m *Model) loadView(view viewID) tea.Cmd {
 	if view == managersView {
+		m.healthForcePending = true
 		return m.loadManagers()
 	}
 	s := &m.states[view]
@@ -208,12 +244,22 @@ func (m *Model) loadView(view viewID) tea.Cmd {
 	s.generation++
 	if view == discoverView && strings.TrimSpace(s.query) == "" {
 		s.loading = false
-		return nil
+		return m.ensureInventory(false)
 	}
 	ctx, cancel := context.WithCancel(m.ctx)
 	s.cancel = cancel
 	s.loading, s.stale, s.err = true, s.loaded, nil
-	generation, query, manager := s.generation, s.query, m.managerFilter
+	generation, query := s.generation, s.query
+	s.scopeKey = m.scopeKey()
+	if view == installedView {
+		if cached := m.inventories[s.scopeKey]; cached != nil && cached.loading {
+			if cached.cancel != nil {
+				cached.cancel()
+			}
+			cached.generation++
+			cached.loading = false
+		}
+	}
 	service := m.service
 	if view == diagnosticsView {
 		name := m.diagnosticName
@@ -226,19 +272,43 @@ func (m *Model) loadView(view viewID) tea.Cmd {
 	if view == discoverView {
 		kind = "search"
 	} else {
-		query, manager = "", ""
+		query = ""
 	}
 	if view == updatesView {
 		kind = "outdated"
 	}
-	return func() tea.Msg {
-		snapshot, err := service.Packages(ctx, kind, query, manager)
+	request := domain.PackageQuery{Kind: kind, Query: query, Managers: m.effectiveManagers(), DeferInventory: view == discoverView, Refresh: s.force}
+	s.force = false
+	command := func() tea.Msg {
+		snapshot, err := service.Query(ctx, request)
 		return packagesMsg{view, generation, query, snapshot, err}
 	}
+	if view == discoverView {
+		return tea.Batch(command, m.ensureInventory(false))
+	}
+	return command
 }
 
 func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
+	if _, ok := message.(tea.MouseMsg); ok {
+		return m, m.mouseMessage(message)
+	}
+	switch message.(type) {
+	case tea.WindowSizeMsg, tea.KeyPressMsg, tea.PasteMsg, managersMsg, packagesMsg, diagnosticsMsg, setupMsg, planMsg, executedMsg, preferencesMsg, inventoryMsg, healthMsg, savedSetMsg:
+		m.invalidateMouse()
+	}
 	switch msg := message.(type) {
+	case preferencesMsg:
+		return m, m.acceptPreferences(msg)
+	case inventoryMsg:
+		m.acceptInventory(msg)
+		return m, nil
+	case healthMsg:
+		m.acceptHealth(msg)
+		return m, nil
+	case savedSetMsg:
+		m.acceptSavedSet(msg)
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width, m.height = max(1, msg.Width), max(1, msg.Height)
 		m.input.SetWidth(max(1, m.width-8))
@@ -252,15 +322,29 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.managersErr = msg.err
 		if msg.err == nil {
 			cursorID := m.managerCursorID()
-			m.managers, m.managersLoaded = msg.managers, true
+			previous := m.managers
+			m.managers, m.managersLoaded = append([]domain.Manager(nil), msg.managers...), true
+			for i := range m.managers {
+				for _, old := range previous {
+					if old.ID == m.managers[i].ID && old.Path == m.managers[i].Path && old.Version == m.managers[i].Version && m.managers[i].Health == nil && old.Health != nil {
+						health := *old.Health
+						m.managers[i].Health = &health
+					}
+				}
+			}
 			m.managerCursor = 0
-			for i, manager := range m.managers {
+			for i, manager := range m.sidebarManagers() {
 				if manager.ID == cursorID {
 					m.managerCursor = i + 1
 				}
 			}
 		}
 		m.reconcile(managersView, false)
+		if m.view == managersView {
+			force := m.healthForcePending
+			m.healthForcePending = false
+			return m, m.checkManagerHealth(force)
+		}
 		return m, nil
 	case packagesMsg:
 		s := &m.states[msg.view]
@@ -269,16 +353,26 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		s.loading, s.err = false, msg.err
 		if msg.err == nil {
-			snapshot := msg.snapshot
+			snapshot := domain.CloneSnapshot(msg.snapshot)
 			s.retainedManagers = nil
 			if msg.view != discoverView {
 				snapshot, s.retainedManagers = retainFailedProviders(s.snapshot, snapshot)
 			}
 			s.snapshot, s.acceptedQuery, s.loaded, s.stale = snapshot, msg.query, true, false
+			if msg.view == discoverView {
+				for i := range snapshot.Packages {
+					snapshot.Packages[i].Candidate = true
+				}
+				s.candidates = domain.CloneSnapshot(snapshot)
+				m.attachDiscover()
+			}
 		} else {
 			s.stale = s.loaded
 		}
 		m.reconcile(msg.view, false)
+		if msg.view == installedView {
+			m.cacheInstalled(s)
+		}
 		return m, nil
 	case diagnosticsMsg:
 		s := &m.states[diagnosticsView]
@@ -338,6 +432,7 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.setup.loaded = false
+		m.invalidateInventories()
 		commands := []tea.Cmd{m.loadManagers()}
 		if m.view != managersView {
 			commands = append(commands, m.loadView(m.view))
@@ -346,6 +441,9 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		if m.executing {
 			return m, nil
+		}
+		if msg.String() == "M" && !m.filtering && m.modal != versionModal && m.modal != saveSetModal {
+			return m, m.navigationKey(msg)
 		}
 		if m.modal != noModal {
 			return m, m.modalKey(msg)
@@ -356,12 +454,12 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.navigationKey(msg)
 	case tea.PasteMsg:
 		// Bracketed paste never falls through into navigation or approval.
-		if m.filtering || m.modal == versionModal {
+		if m.filtering || m.modal == versionModal || m.modal == saveSetModal {
 			return m, m.inputMessage(msg)
 		}
 		return m, nil
 	default:
-		if m.filtering || m.modal == versionModal {
+		if m.filtering || m.modal == versionModal || m.modal == saveSetModal {
 			var cmd tea.Cmd
 			m.input, cmd = m.input.Update(message)
 			return m, cmd
@@ -371,6 +469,9 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) inputMessage(message tea.Msg) tea.Cmd {
+	if m.modal == saveSetModal {
+		return m.saveSetInput(message)
+	}
 	if key, ok := message.(tea.KeyPressMsg); ok {
 		switch key.String() {
 		case "esc", "ctrl+c":
@@ -436,6 +537,20 @@ func (m *Model) navigationKey(key tea.KeyPressMsg) tea.Cmd {
 		m.pendingG = false
 	}
 	switch name {
+	case "M":
+		m.mouseEnabled = !m.mouseEnabled
+		m.mouseOverride = true
+		m.status = fmt.Sprintf("Mouse %s. M toggles terminal capture.", map[bool]string{true: "enabled", false: "disabled"}[m.mouseEnabled])
+		return nil
+	case "f":
+		return m.openProviders()
+	case "b":
+		if m.view == managersView {
+			m.showAllManagers = !m.showAllManagers
+			m.managerCursor = 0
+			m.reconcile(managersView, true)
+		}
+		return nil
 	case "q", "ctrl+c":
 		m.quitting = true
 		m.cancelAll()
@@ -496,9 +611,7 @@ func (m *Model) navigationKey(key tea.KeyPressMsg) tea.Cmd {
 			m.diagnosticName = ""
 			return m.loadView(diagnosticsView)
 		}
-		m.managerFilter = ""
-		m.managerCursor = 0
-		m.reconcile(m.view, true)
+		return m.applyScope(m.preferences.Default, "Default")
 	case "enter":
 		if m.managerFocus {
 			return m.applyManagerFilter()
@@ -509,6 +622,11 @@ func (m *Model) navigationKey(key tea.KeyPressMsg) tea.Cmd {
 			m.modalOffset = 0
 		}
 	case "r":
+		m.states[m.view].force = true
+		if m.view == discoverView {
+			inventory := m.ensureInventory(true)
+			return tea.Batch(m.loadView(m.view), inventory)
+		}
 		return m.loadView(m.view)
 	case "s":
 		m.modal = setupModal
@@ -534,6 +652,8 @@ func (m *Model) navigationKey(key tea.KeyPressMsg) tea.Cmd {
 }
 
 func (m *Model) switchView(index int) tea.Cmd {
+	m.filtering = false
+	m.input.Blur()
 	m.view = viewID(index)
 	m.pendingG = false
 	m.reconcile(m.view, false)
@@ -541,11 +661,14 @@ func (m *Model) switchView(index int) tea.Cmd {
 		if !m.managersLoaded && !m.managersLoading {
 			return m.loadManagers()
 		}
-		return nil
+		return m.checkManagerHealth(false)
 	}
 	s := &m.states[m.view]
 	if !s.loading && (!s.loaded || s.stale) {
 		return m.loadView(m.view)
+	}
+	if m.view == discoverView {
+		return m.ensureInventory(false)
 	}
 	return nil
 }
@@ -563,33 +686,29 @@ func (m *Model) clearSearch() {
 }
 
 func (m *Model) applyManagerFilter() tea.Cmd {
-	m.managerFilter = m.managerCursorID()
+	id := m.managerCursorID()
 	m.managerFocus = false
-	// Search results belong to the provider selection that produced them, even
-	// if the user changes that selection from another view while search runs.
-	m.cancelView(discoverView)
-	for i := range m.states {
-		m.reconcile(viewID(i), true)
+	if id == "" {
+		return m.applyScope(m.preferences.Default, "Default")
 	}
-	if m.view == discoverView && m.states[m.view].query != "" {
-		return m.loadView(m.view)
-	}
-	return nil
+	return m.applyScope([]string{id}, id)
 }
 
 func (m *Model) managerCursorID() string {
-	if m.managerCursor > 0 && m.managerCursor <= len(m.managers) {
-		return m.managers[m.managerCursor-1].ID
+	managers := m.sidebarManagers()
+	if m.managerCursor > 0 && m.managerCursor <= len(managers) {
+		return managers[m.managerCursor-1].ID
 	}
 	return ""
 }
 
 func (m *Model) move(delta int) {
 	if m.managerFocus {
-		m.managerCursor = clamp(m.managerCursor+delta, 0, len(m.managers))
+		m.managerCursor = clamp(m.managerCursor+delta, 0, len(m.sidebarManagers()))
 		return
 	}
 	s := &m.states[m.view]
+	m.detailOffset = 0
 	rows := m.rows(m.view)
 	s.position = clamp(s.position+delta, 0, len(rows)-1)
 	if len(rows) > 0 {
@@ -662,6 +781,20 @@ func (m *Model) cancelAll() {
 		m.planCancel()
 	}
 	m.planGeneration++
+	if m.healthCancel != nil {
+		m.healthCancel()
+	}
+	m.healthGeneration++
+	if m.prefsCancel != nil {
+		m.prefsCancel()
+	}
+	m.prefsGeneration++
+	for _, inventory := range m.inventories {
+		if inventory.cancel != nil {
+			inventory.cancel()
+		}
+		inventory.generation++
+	}
 }
 
 type row struct {
@@ -682,15 +815,26 @@ func (m *Model) rows(view viewID) []row {
 	case managersView:
 		for i := range m.managers {
 			manager := &m.managers[i]
-			rows = append(rows, row{key: manager.ID, label: manager.Name, secondary: manager.Status, manager: manager.ID, managerInfo: manager})
+			if !m.showAllManagers && !manager.Available && manager.Path == "" {
+				continue
+			}
+			status := manager.Status
+			if manager.Health != nil {
+				status += " · " + manager.Health.UpdateStatus
+			}
+			rows = append(rows, row{key: manager.ID, label: manager.Name, secondary: status, manager: manager.ID, managerInfo: manager})
 		}
 	case diagnosticsView:
-		for i := range s.report.Findings {
-			f := &s.report.Findings[i]
+		report := s.report
+		if m.scopeChanged {
+			report = domain.FilterDiagnostics(report, m.effectiveManagers())
+		}
+		for i := range report.Findings {
+			f := &report.Findings[i]
 			rows = append(rows, row{key: fmt.Sprintf("finding:%s:%s:%s", f.Kind, f.Name, strings.Join(f.Paths, "|")), label: f.Name, secondary: f.Kind, finding: f})
 		}
-		for i := range s.report.Executables {
-			e := &s.report.Executables[i]
+		for i := range report.Executables {
+			e := &report.Executables[i]
 			status := "shadowed"
 			if e.PathIndex < 0 {
 				status = "outside PATH"
@@ -709,6 +853,14 @@ func (m *Model) rows(view viewID) []row {
 			version := p.Version
 			if view == discoverView {
 				version = p.Latest
+				if version == "" {
+					version = "version not reported"
+				}
+				if p.InstallState == "installed" {
+					version = "installed · " + version
+				} else if p.InstallState == "checking" {
+					version += " · checking"
+				}
 			}
 			if version == "" {
 				version = "?"
@@ -724,7 +876,7 @@ func (m *Model) rows(view viewID) []row {
 	}
 	query := strings.ToLower(strings.TrimSpace(s.query))
 	return slices.DeleteFunc(rows, func(r row) bool {
-		if m.managerFilter != "" && view != managersView && r.manager != m.managerFilter {
+		if len(m.effectiveManagers()) > 0 && view != managersView && view != diagnosticsView && !m.includesManager(r.manager) {
 			// Findings concern several providers; retain them when their paths cannot be attributed.
 			if r.finding == nil {
 				return true

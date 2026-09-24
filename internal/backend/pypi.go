@@ -15,7 +15,7 @@ import (
 
 // PyPIExact performs a named-project lookup, never a claimed full-text search.
 func PyPIExact(ctx context.Context, client *http.Client, base, query string) (domain.Snapshot, error) {
-	s := domain.Snapshot{Packages: []domain.Package{}, ObservedAt: time.Now(), Issues: []domain.Issue{{Manager: "uvx", Message: "uv tools: exact PyPI project-name lookup only; CLI entrypoints are verified by uv during installation"}}}
+	s := domain.Snapshot{Packages: []domain.Package{}, ObservedAt: time.Now(), Issues: []domain.Issue{{Manager: "uvx", Kind: "notice", Message: "uv tools: exact PyPI project-name lookup only; CLI entrypoints are verified by uv during installation"}}}
 	if !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`).MatchString(query) {
 		return s, nil
 	}

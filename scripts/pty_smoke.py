@@ -80,6 +80,10 @@ def main() -> None:
             os.write(master, data)
             read_for(pause)
 
+        def click(x: int, y: int, pause: float = 0.2) -> None:
+            # SGR coordinates are one-based; our shared UI layout is zero-based.
+            send(f"\x1b[<0;{x + 1};{y + 1}M\x1b[<0;{x + 1};{y + 1}m".encode(), pause)
+
         def require(text: str) -> None:
             if text.encode() not in capture:
                 raise AssertionError(f"Terminal output did not contain {text!r}")
@@ -91,7 +95,22 @@ def main() -> None:
         try:
             read_for(1.3)
             require("alpha")
-            send(b"/jkhqliuxa?")
+            if b"\x1b[?1002h" not in capture:
+                raise AssertionError("Mouse cell-motion reporting was not enabled")
+            click(26, 7)  # Select the second item using actual SGR mouse input.
+            click(26, 6)
+            click(5, 23)  # Open ordered provider picker through its footer button.
+            require("Ordered provider")
+            click(8, 6)  # Load the 'all' group; it changes only the draft.
+            if receipt.exists():
+                raise AssertionError("Changing a provider draft performed a mutation")
+            click(3, 23, 0.6)  # Apply the ordered scope once.
+            send(b"s")
+            require("Manager setup")
+            click(6, 5)  # Setup checkbox on/off; never submit setup.
+            click(6, 5)
+            send(b"\x1b")
+            send(b"/Mjkhqliuxa?")
             alive()  # Printable shortcuts remain text.
             send(b"\x1b")
             send(b"?")
@@ -100,18 +119,21 @@ def main() -> None:
             send(b"\t")
             send(b"j")
             send(b"\r")  # Apply the manager filter.
-            send(b"2")
+            click(18, 1)  # Discover tab.
             send(b"/alpha\r", 0.7)  # The fake query deliberately takes 300 ms.
-            send(b"i", 0.3)
+            click(44, 22, 0.3)  # Install button uses the same plan path as i.
             require("Review changes")
             send(b"\r")
             if receipt.exists() or b"Native prompt:" in capture:
                 raise AssertionError("Enter approved a plan without explicit confirmation")
-            send(b"\x1b")
+            click(3, 23)  # Cancel the review.
             if receipt.exists():
                 raise AssertionError("Cancelling a plan caused a mutation")
             send(b"i")
-            send(b"y", 0.5)
+            send(b"\x1b[<0;14;24M\x1b[<0;61;24m")  # Release off the Execute button.
+            if receipt.exists() or b"Native prompt:" in capture:
+                raise AssertionError("Dragging off Execute still approved the plan")
+            click(13, 23, 0.5)  # Explicit mouse approval, after the review is visible.
             require("Native prompt: type continue:")
             send(b"continue\r", 0.4)
             require("Fixture operation completed")
@@ -152,7 +174,8 @@ def main() -> None:
             if json.loads(receipt.read_text())["calls"] != 1:
                 raise AssertionError("Unexpected extra fake mutation")
             print(
-                "PTY PASS: delayed reads, text/paste isolation, manager filter, search, "
+                "PTY PASS: SGR mouse tabs/rows/buttons/checkboxes, ordered provider picker, "
+                "delayed reads, text/paste isolation, manager filter, search, "
                 "review/cancel, explicit approval, native prompt, result acknowledgement, "
                 "dashboard return, 48x16 resize, clean exit."
             )

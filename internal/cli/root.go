@@ -19,20 +19,21 @@ import (
 	"github.com/daviddwlee84/lazypkg/internal/config"
 	"github.com/daviddwlee84/lazypkg/internal/domain"
 	"github.com/daviddwlee84/lazypkg/internal/process"
-	"github.com/daviddwlee84/lazypkg/internal/tui"
 	"github.com/spf13/cobra"
 )
 
 var Version = "dev"
 
+const BaseVersion = "v0.1.1"
+
 func version() string {
 	if Version != "" && Version != "dev" {
 		return Version
 	}
-	if b, ok := debug.ReadBuildInfo(); ok && b.Main.Version != "" && b.Main.Version != "(devel)" {
+	if b, ok := debug.ReadBuildInfo(); ok && b.Main.Version != "" && b.Main.Version != "(devel)" && !strings.Contains(b.Main.Version, "dirty") {
 		return b.Main.Version
 	}
-	return "dev"
+	return BaseVersion + "-dev"
 }
 
 type usageError struct{ err error }
@@ -53,10 +54,12 @@ func ExitCode(err error) int {
 }
 
 type options struct {
-	override             domain.Service
-	config, mpm, manager string
-	json                 bool
-	timeout              int
+	override                domain.Service
+	config, mpm, group, set string
+	managers                []string
+	mouse                   bool
+	json                    bool
+	timeout                 int
 }
 
 func terminal(cmd *cobra.Command) bool {
@@ -100,6 +103,9 @@ func (o *options) service() (domain.Service, error) {
 		}
 		c.TimeoutSeconds = o.timeout
 	}
+	if _, err := c.Select(o.query("installed", "")); err != nil {
+		return nil, usageError{err}
+	}
 	return app.New(c), nil
 }
 func NewRoot() *cobra.Command { return newRoot(nil) }
@@ -109,15 +115,36 @@ func newRoot(service domain.Service) *cobra.Command {
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usageError{err} })
 	root.PersistentFlags().StringVar(&o.config, "config", "", "Path to TOML configuration")
 	root.PersistentFlags().StringVar(&o.mpm, "mpm", "", "Explicit mpm executable (tested version "+domain.MPMVersion+")")
-	root.PersistentFlags().StringVarP(&o.manager, "manager", "m", "", "Restrict to one manager (uv means uv tools)")
+	root.PersistentFlags().StringSliceVarP(&o.managers, "manager", "m", nil, "Select managers (repeat or comma separate; uv means uv tools)")
+	root.PersistentFlags().StringVar(&o.group, "group", "", "Select a built-in manager group")
+	root.PersistentFlags().StringVar(&o.set, "set", "", "Select an ordered saved manager set")
+	root.PersistentFlags().BoolVar(&o.mouse, "mouse", true, "Enable mouse interaction in the dashboard")
 	root.PersistentFlags().BoolVar(&o.json, "json", false, "Emit machine-readable JSON; never prompt")
 	root.PersistentFlags().IntVar(&o.timeout, "timeout", 0, "Read command timeout in seconds (1..600)")
 	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
 		if cmd.Flags().Changed("timeout") && (o.timeout < 1 || o.timeout > 600) {
 			return usageError{fmt.Errorf("--timeout must be 1..600 seconds")}
 		}
-		if o.manager != "" && !backend.Known(backend.NormalizeManager(o.manager)) {
-			return usageError{fmt.Errorf("unsupported --manager %q", o.manager)}
+		selectors := 0
+		if len(o.managers) > 0 {
+			selectors++
+		}
+		if o.group != "" {
+			selectors++
+		}
+		if o.set != "" {
+			selectors++
+		}
+		if selectors > 1 {
+			return usageError{fmt.Errorf("choose one of --manager, --group or --set")}
+		}
+		if cmd.Flags().Changed("manager") && len(o.managers) == 0 {
+			return usageError{fmt.Errorf("--manager requires at least one ID")}
+		}
+		for _, id := range o.managers {
+			if !backend.Known(backend.NormalizeManager(id)) {
+				return usageError{fmt.Errorf("unsupported --manager %q", id)}
+			}
 		}
 		return nil
 	}
@@ -135,7 +162,7 @@ func newRoot(service domain.Service) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return tui.Run(cmd.Context(), s, "installed")
+		return o.runTUI(cmd, s, "installed")
 	}
 	for _, q := range []struct{ use, kind, desc string }{{"list [filter]", "installed", "List globally installed packages and tools"}, {"search <query>", "search", "Search available managers; uv tools use exact PyPI names"}, {"updates [filter]", "outdated", "List available updates"}} {
 		q := q
@@ -152,7 +179,7 @@ func newRoot(service domain.Service) *cobra.Command {
 			if len(args) > 0 {
 				query = args[0]
 			}
-			v, err := s.Packages(cmd.Context(), q.kind, query, o.manager)
+			v, err := s.Query(cmd.Context(), o.query(q.kind, query))
 			if err != nil {
 				return err
 			}
@@ -160,9 +187,9 @@ func newRoot(service domain.Service) *cobra.Command {
 				return writeJSON(cmd.OutOrStdout(), v)
 			}
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 4, 2, ' ', 0)
-			fmt.Fprintln(w, "PACKAGE\tVERSION\tLATEST\tMANAGER\tSCOPE")
+			fmt.Fprintln(w, "PACKAGE\tINSTALLED\tAVAILABLE\tMANAGER\tSCOPE")
 			for _, p := range v.Packages {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", clean(p.ID), clean(p.Version), clean(p.Latest), p.Manager, clean(p.Scope))
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", clean(p.ID), clean(installedLabel(p)), clean(p.Latest), p.Manager, clean(p.Scope))
 			}
 			w.Flush()
 			issues(cmd.ErrOrStderr(), v.Issues)
@@ -171,26 +198,8 @@ func newRoot(service domain.Service) *cobra.Command {
 		}
 		root.AddCommand(c)
 	}
-	managers := &cobra.Command{Use: "managers", Short: "Show detected and supported managers and their capabilities", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		s, err := o.service()
-		if err != nil {
-			return err
-		}
-		v, err := s.Managers(cmd.Context())
-		if err != nil {
-			return err
-		}
-		if o.json {
-			return writeJSON(cmd.OutOrStdout(), v)
-		}
-		w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 4, 2, ' ', 0)
-		fmt.Fprintln(w, "MANAGER\tVERSION\tSTATUS\tOPERATIONS")
-		for _, m := range v {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", m.ID, clean(m.Version), m.Status, strings.Join(m.Capabilities, ", "))
-		}
-		return w.Flush()
-	}}
-	root.AddCommand(managers)
+	root.AddCommand(managerCommands(o), setCommands(o))
+
 	diag := &cobra.Command{Use: "diagnose [command]", Short: "Explain executable ownership and PATH shadowing", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		s, err := o.service()
 		if err != nil {
@@ -204,6 +213,11 @@ func newRoot(service domain.Service) *cobra.Command {
 		if err != nil {
 			return err
 		}
+		ids, err := o.selection(cmd.Context(), s)
+		if err != nil {
+			return err
+		}
+		v = domain.FilterDiagnostics(v, ids)
 		if o.json {
 			return writeJSON(cmd.OutOrStdout(), v)
 		}
@@ -241,14 +255,14 @@ func newRoot(service domain.Service) *cobra.Command {
 		c.Flags().BoolVar(&dry, "dry-run", false, "Show the real operation plan without executing")
 		c.Flags().StringVar(&ver, "version", "", "mise version (required for remove/activate)")
 		c.RunE = func(cmd *cobra.Command, args []string) error {
-			if o.manager == "" {
+			if len(o.managers) != 1 || o.group != "" || o.set != "" {
 				return usageError{fmt.Errorf("--manager is required; example: lazypkg %s ripgrep --manager brew", op)}
 			}
 			s, err := o.service()
 			if err != nil {
 				return err
 			}
-			p, err := s.Plan(cmd.Context(), domain.ActionRequest{Operation: op, Manager: o.manager, Package: args[0], Version: ver})
+			p, err := s.Plan(cmd.Context(), domain.ActionRequest{Operation: op, Manager: backend.NormalizeManager(o.managers[0]), Package: args[0], Version: ver})
 			if err != nil {
 				return err
 			}
@@ -279,7 +293,7 @@ func newRoot(service domain.Service) *cobra.Command {
 				}
 				return usageError{fmt.Errorf("name setup items or run lazypkg setup in a terminal")}
 			}
-			return tui.Run(cmd.Context(), s, "setup")
+			return o.runTUI(cmd, s, "setup")
 		}
 		if interactive {
 			return usageError{fmt.Errorf("use bare setup --interactive for the selection wizard, or explicit IDs without --interactive")}
@@ -359,6 +373,16 @@ func apply(cmd *cobra.Command, s domain.Service, p domain.ActionPlan, jsonMode, 
 		}
 		ShowPlan(cmd.OutOrStdout(), p)
 		return nil
+	}
+	if p.ManagerUpdate != nil && !p.ManagerUpdate.ApplySupported {
+		if jsonMode {
+			if err := writeJSON(cmd.OutOrStdout(), p); err != nil {
+				return err
+			}
+		} else {
+			ShowPlan(cmd.OutOrStdout(), p)
+		}
+		return fmt.Errorf("this manager has guidance only; no update was executed")
 	}
 	if !yes && (jsonMode || !terminal(cmd)) {
 		return usageError{fmt.Errorf("confirmation required: inspect --dry-run, then supply --yes")}

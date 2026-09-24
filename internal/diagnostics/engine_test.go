@@ -368,7 +368,7 @@ func TestKnownEntrypointsOutsidePATHAndMiseShimSelection(t *testing.T) {
 	if len(r.Findings) != 1 || r.Findings[0].Kind != "inactive-runtime" {
 		t.Fatalf("inactive runtime labeled shadowed: %#v", r.Findings)
 	}
-	if len(runner.calls) != 1 || runner.calls[0].Env["MISE_AUTO_INSTALL"] != "0" {
+	if len(runner.calls) != 1 || runner.calls[0].Env["MISE_AUTO_INSTALL"] != "0" || runner.calls[0].Env["MISE_NOT_FOUND_AUTO_INSTALL"] != "false" {
 		t.Fatal("shim query must be bounded and disable autoinstall")
 	}
 }

@@ -38,6 +38,9 @@ func (m *Model) View() tea.View {
 	v := tea.NewView(content)
 	v.AltScreen = true
 	v.WindowTitle = "lazypkg"
+	if m.mouseEnabled {
+		v.MouseMode = tea.MouseModeCellMotion
+	}
 	return v
 }
 
@@ -46,20 +49,23 @@ func (m *Model) dashboardView() string {
 	tabs := m.tabs()
 	context := m.contextLine()
 	bodyHeight := max(3, m.height-6)
+	layout := m.layout()
 	var body string
 	if m.width >= 110 {
-		leftWidth, rightWidth := 22, min(42, m.width/3)
-		middleWidth := m.width - leftWidth - rightWidth
+		leftWidth, rightWidth := layout.managers.w, layout.details.w
+		middleWidth := layout.items.w
 		left := m.managerPane(leftWidth, bodyHeight)
 		middle := m.packagePane(middleWidth, bodyHeight)
 		details := "Select an item to inspect its source and paths.\n\nEnter opens a scrollable detail view."
 		if r, ok := m.selectedRow(); ok {
 			details = m.rowDetails(r)
 		}
-		right := pane("Details", wrapLines(details, rightWidth-4), rightWidth, bodyHeight, false)
+		detailLines := wrapLines(details, rightWidth-4)
+		detailStart := clamp(m.detailOffset, 0, max(0, len(detailLines)-(bodyHeight-3)))
+		right := pane("Details", detailLines[detailStart:], rightWidth, bodyHeight, false)
 		body = lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
 	} else if m.width >= 70 {
-		leftWidth := 20
+		leftWidth := layout.managers.w
 		body = lipgloss.JoinHorizontal(lipgloss.Top, m.managerPane(leftWidth, bodyHeight), m.packagePane(m.width-leftWidth, bodyHeight))
 	} else if m.managerFocus {
 		body = m.managerPane(m.width, bodyHeight)
@@ -73,7 +79,7 @@ func (m *Model) dashboardView() string {
 
 func (m *Model) tabs() string {
 	if m.width < 70 {
-		return accent.Render(fmt.Sprintf(" %d/5 %s", m.view+1, viewNames[m.view])) + muted.Render("   ←/→ h/l change view")
+		return line(accent.Render(fmt.Sprintf(" ‹ %d/5 %s · h/l views", m.view+1, viewNames[m.view])), m.width-3) + " › "
 	}
 	var tabs []string
 	for i, name := range viewNames {
@@ -89,10 +95,18 @@ func (m *Model) tabs() string {
 }
 
 func (m *Model) contextLine() string {
-	manager := "All managers"
-	if m.managerFilter != "" {
-		manager = "Manager: " + m.managerFilter
+	manager := m.scopeName
+	if manager == "" {
+		manager = "Configured default"
 	}
+	if ids := m.effectiveManagers(); len(ids) > 0 {
+		if len(ids) > 3 {
+			manager += fmt.Sprintf(" · %d providers", len(ids))
+		} else if len(ids) != 1 || manager != ids[0] {
+			manager += " · " + strings.Join(ids, ", ")
+		}
+	}
+	manager = ansi.Truncate(clean(manager), max(15, m.width/2), "…")
 	s := &m.states[m.view]
 	state := "ready"
 	if m.view == managersView {
@@ -100,6 +114,14 @@ func (m *Model) contextLine() string {
 			state = "detecting…"
 		} else if m.managersErr != nil {
 			state = "discovery failed · s setup / e errors"
+		} else if m.healthLoading {
+			state = "checking manager updates…"
+		} else if m.healthErr != nil {
+			state = "update check incomplete · e details"
+		} else if m.showAllManagers {
+			state = "all catalog · b detected only"
+		} else {
+			state = "detected managers · b all catalog"
 		}
 	} else {
 		switch {
@@ -120,6 +142,9 @@ func (m *Model) contextLine() string {
 		}
 		if m.view == diagnosticsView && s.loaded && !s.loading && s.err == nil {
 			state = orUnknown(s.report.Scope)
+			if m.scopeChanged {
+				state += " · full PATH peers retained"
+			}
 		}
 		if m.view == diagnosticsView && m.diagnosticName != "" {
 			state += " · command: " + m.diagnosticName
@@ -148,12 +173,12 @@ func (m *Model) managerPane(width, height int) string {
 		}
 		lines = append(lines, value)
 	}
-	all := "All managers"
-	if m.managerFilter == "" {
+	all := "Configured default"
+	if !m.scopeChanged || m.scopeName == "Default" {
 		all += " *"
 	}
 	items := []string{all}
-	for _, manager := range m.managers {
+	for _, manager := range m.sidebarManagers() {
 		mark := "○"
 		if manager.Available {
 			mark = "✓"
@@ -161,7 +186,7 @@ func (m *Model) managerPane(width, height int) string {
 			mark = "!"
 		}
 		label := mark + " " + manager.ID
-		if manager.ID == m.managerFilter {
+		if m.includesManager(manager.ID) {
 			label += " *"
 		}
 		items = append(items, label)
@@ -180,7 +205,7 @@ func (m *Model) managerPane(width, height int) string {
 	if !m.managersLoading && len(m.managers) == 0 && m.managersErr == nil {
 		lines = append(lines, "No providers found", "s setup")
 	}
-	return pane("Managers", lines, width, height, m.managerFocus)
+	return pane("Managers · f sets", lines, width, height, m.managerFocus)
 }
 
 func (m *Model) packagePane(width, height int) string {
@@ -239,6 +264,9 @@ func (m *Model) emptyText() string {
 		if m.managersErr != nil {
 			return "Manager discovery could not finish.\n\nPress e for the error or s to set up the backend."
 		}
+		if !m.showAllManagers && len(m.managers) > 0 {
+			return "No detected managers match this view.\n\nb shows the full catalog, including missing managers.\ns opens setup."
+		}
 		return "No managers match this filter.\n\nEsc clears the filter; s opens setup."
 	}
 	if s.loading {
@@ -266,22 +294,10 @@ func (m *Model) emptyText() string {
 }
 
 func (m *Model) footer() (string, string) {
-	if m.filtering {
-		label := "Enter accept filter"
-		if m.view == discoverView {
-			label = "Enter search"
-		}
-		return accent.Render(" " + label + " · Esc clear / back"), muted.Render(" Printable keys edit text; ↑/↓ selects visible rows.")
-	}
-	if m.managerFocus {
-		return " ↑↓/jk select · Enter filter · Tab items · s setup", muted.Render(" h/l views · / query · ? help · q quit")
-	}
-	var parts []string
-	parts = append(parts, "↑↓/jk select", "Enter details", "/ query")
-	for _, a := range m.actions() {
-		parts = append(parts, a.key+" "+a.label)
-	}
-	return " " + strings.Join(parts, " · "), muted.Render(" Tab focus · h/l views · r refresh · s setup · ? help · q quit")
+	first, second := m.footerButtons()
+	a, _ := buttonLine(first, m.width, m.height-2)
+	b, _ := buttonLine(second, m.width, m.height-1)
+	return a, muted.Render(b)
 }
 
 func (m *Model) statusLine() string {
@@ -315,7 +331,14 @@ func (m *Model) rowDetails(r row) string {
 		if p.Name != "" && p.Name != p.ID {
 			lines = append(lines, p.Name)
 		}
-		lines = append(lines, "", "Provider: "+p.Manager, "Installed: "+orUnknown(p.Version), "Available: "+orUnknown(p.Latest), "Scope: "+orUnknown(p.Scope))
+		latest := p.Latest
+		if latest == "" {
+			latest = "not reported by provider"
+		}
+		lines = append(lines, "", "Provider: "+p.Manager, "Installed: "+installationLabel(p), "Available version: "+latest, "Scope: "+orUnknown(p.Scope))
+		if !p.InventoryAt.IsZero() {
+			lines = append(lines, "Inventory observed: "+observed(p.InventoryAt))
+		}
 		if m.states[m.view].retainedManagers[p.Manager] {
 			lines = append(lines, "", "STALE: retained from the previous inventory because this provider's refresh failed. Refresh before changing it.")
 		}
@@ -331,6 +354,16 @@ func (m *Model) rowDetails(r row) string {
 		if len(p.ExecutablePaths) > 0 {
 			lines = append(lines, "", "Executable paths:")
 			lines = append(lines, p.ExecutablePaths...)
+		}
+		if len(p.PathMatches) > 0 {
+			lines = append(lines, "", "Also present on PATH (presence is not installation ownership):")
+			for _, match := range p.PathMatches {
+				label := match.Path
+				if match.Preferred {
+					label += " (first PATH match)"
+				}
+				lines = append(lines, label)
+			}
 		}
 		if p.Manager == "mise" {
 			if m.pendingActivation(p) {
@@ -350,6 +383,30 @@ func (m *Model) rowDetails(r row) string {
 		}
 	} else if manager := r.managerInfo; manager != nil {
 		lines = append(lines, manager.Name, "", "ID: "+manager.ID, "Status: "+manager.Status, "Version: "+orUnknown(manager.Version), "CLI: "+orUnknown(manager.Path), "", "Capabilities: "+strings.Join(manager.Capabilities, ", "))
+		lines = append(lines, "Scope: "+orUnknown(manager.Scope), "Required: "+orUnknown(manager.Requirement))
+		if manager.Reason != "" {
+			lines = append(lines, "Reason: "+manager.Reason)
+		}
+		if len(manager.Groups) > 0 {
+			lines = append(lines, "Groups: "+strings.Join(manager.Groups, ", "))
+		}
+		if health := manager.Health; health != nil {
+			lines = append(lines, "", "Manager update: "+health.UpdateStatus, "Candidate: "+orUnknown(health.CandidateVersion), "Owner: "+orUnknown(health.Owner), "Channel: "+orUnknown(health.Channel), "Strategy: "+orUnknown(health.Strategy), "Checked: "+observed(health.CheckedAt))
+			if health.Cached {
+				lines = append(lines, "Result from the 24-hour check cache; r forces a check.")
+			}
+			if health.Stale {
+				lines = append(lines, "STALE update check")
+			}
+			if health.Recommendation != "" {
+				lines = append(lines, health.Recommendation)
+			}
+			if health.GuideURL != "" {
+				lines = append(lines, health.GuideURL)
+			}
+		} else if manager.Path != "" {
+			lines = append(lines, "", "Update check: pending; u reviews an update through the owning manager.")
+		}
 		if !manager.Available {
 			lines = append(lines, "", "Press s after closing this panel to review setup.")
 		}
@@ -409,6 +466,10 @@ func (m *Model) modalView() string {
 		return m.versionView()
 	case setupModal:
 		return m.setupView()
+	case providersModal:
+		return m.providersView()
+	case saveSetModal:
+		return m.saveSetView()
 	case planModal:
 		title = "Review changes"
 		if m.planLoading {
@@ -433,7 +494,8 @@ func (m *Model) versionView() string {
 	width, height := m.width, max(3, m.height-4)
 	lines := wrapLines(m.versionRequest.Package+"\n\nChoose a version or latest; the plan resolves it before installation.\nInstallation does not activate the tool.", width-4)
 	lines = append(lines, "", m.input.View())
-	return strings.Join([]string{line(accent.Render(" lazypkg / Install with mise"), width), pane("Version", lines, width, height, true), line(clean(m.status), width), line(" Enter review · Esc cancel", width), line(" Printable keys edit the version.", width)}, "\n")
+	footer, _ := buttonLine(m.modalButtons(), width, m.height-1)
+	return strings.Join([]string{line(accent.Render(" lazypkg / Install with mise"), width), pane("Version", lines, width, height, true), line(clean(m.status), width), line(" Printable keys edit the version.", width), footer}, "\n")
 }
 
 func (m *Model) scrollModal(title, text, footer string) string {
@@ -444,7 +506,8 @@ func (m *Model) scrollModal(title, text, footer string) string {
 	visible := lines[offset:min(len(lines), offset+available)]
 	body := pane(title, visible, width, height, true)
 	count := fmt.Sprintf(" %d–%d / %d lines", min(offset+1, len(lines)), min(offset+available, len(lines)), len(lines))
-	return strings.Join([]string{line(accent.Render(" lazypkg / "+title), width), body, line(muted.Render(count), width), line(clean(m.status), width), line(footer, width)}, "\n")
+	footer, _ = buttonLine(m.modalButtons(), width, m.height-1)
+	return strings.Join([]string{line(accent.Render(" lazypkg / "+title), width), body, line(muted.Render(count+" · ↑↓/wheel scroll"), width), line(clean(m.status), width), line(footer, width)}, "\n")
 }
 
 func (m *Model) setupView() string {
@@ -456,8 +519,7 @@ func (m *Model) setupView() string {
 		lines = wrapLines("Setup discovery failed:\n"+m.setup.err.Error()+"\n\nr retry · Esc back", width-4)
 	} else {
 		lines = append(lines, "Choose components; review once before anything runs.", "")
-		count := max(1, height-8)
-		start := clamp(m.setup.position-count+1, 0, max(0, len(m.setup.options)-count))
+		start, count := m.setupWindow()
 		for i := start; i < min(start+count, len(m.setup.options)); i++ {
 			option := m.setup.options[i]
 			check := "[ ]"
@@ -494,12 +556,77 @@ func (m *Model) setupView() string {
 			lines = append(lines, "No additional setup options are available.")
 		}
 	}
-	return strings.Join([]string{line(accent.Render(" lazypkg / Setup"), width), pane("Manager setup", lines, width, height, true), line(clean(m.status), width), line(" Space toggle · ↑↓/jk select · Enter review", width), line(" Esc back · r refresh choices", width)}, "\n")
+	footer, _ := buttonLine(m.modalButtons(), width, m.height-1)
+	return strings.Join([]string{line(accent.Render(" lazypkg / Setup"), width), pane("Manager setup", lines, width, height, true), line(clean(m.status), width), line(" Space/click toggle · ↑↓/jk select", width), footer}, "\n")
+}
+
+func (m *Model) providersView() string {
+	width, height := m.width, max(3, m.height-4)
+	lines := []string{fmt.Sprintf("%d selected · draft only until Apply", len(m.providerPicker.selected)), ""}
+	choices := m.providerChoices()
+	start, count := m.providerWindow()
+	for i := start; i < min(len(choices), start+count); i++ {
+		choice := choices[i]
+		prefix := "  "
+		if i == m.providerPicker.position {
+			prefix = "> "
+		}
+		label := choice.label
+		if choice.kind == "manager" {
+			index := -1
+			for j, id := range m.providerPicker.selected {
+				if id == choice.id {
+					index = j
+					break
+				}
+			}
+			check := "[ ]"
+			if index >= 0 {
+				check = fmt.Sprintf("[%d]", index+1)
+			}
+			label = check + " " + label
+		} else {
+			label = "+ " + label
+		}
+		label = line(prefix+clean(label), width-2)
+		if i == m.providerPicker.position {
+			label = selectedStyle.Render(label)
+		}
+		lines = append(lines, label)
+	}
+	footer, _ := buttonLine(m.modalButtons(), width, m.height-1)
+	return strings.Join([]string{line(accent.Render(" lazypkg / Ordered provider sets"), width), pane("Groups, saved sets, and managers", lines, width, height, true), line(clean(m.status), width), line(" Space/click load or toggle · [/] move priority · S save", width), footer}, "\n")
+}
+
+func (m *Model) saveSetView() string {
+	width, height := m.width, max(3, m.height-4)
+	check := "[ ]"
+	if m.providerPicker.saveDefault {
+		check = "[x]"
+	}
+	lines := []string{"Priority: " + strings.Join(m.providerPicker.selected, " > "), "", m.input.View(), "", check + " Make this the configured default"}
+	if m.providerPicker.err != nil {
+		lines = append(lines, "", clean(m.providerPicker.err.Error()))
+	}
+	footer, _ := buttonLine(m.modalButtons(), width, m.height-1)
+	return strings.Join([]string{line(accent.Render(" lazypkg / Save ordered set"), width), pane("Save preferences", lines, width, height, true), line(clean(m.status), width), line(" Tab/click toggles default · Enter saves · Esc returns", width), footer}, "\n")
 }
 
 func (m *Model) planText() string {
 	plan := m.plan
 	lines := []string{plan.Title, ""}
+	if health := plan.ManagerUpdate; health != nil {
+		lines = append(lines, "Manager: "+health.Manager, "Owner: "+orUnknown(health.Owner), "Strategy: "+orUnknown(health.Strategy))
+		if !health.ApplySupported {
+			lines = append(lines, "Guidance only — no command will be executed.")
+		}
+		if health.Recommendation != "" {
+			lines = append(lines, health.Recommendation)
+		}
+		if health.GuideURL != "" {
+			lines = append(lines, health.GuideURL)
+		}
+	}
 	if plan.Request.Operation != "" {
 		lines = append(lines, "Operation: "+plan.Request.Operation, "Provider: "+plan.Request.Manager, "Package: "+plan.Request.Package)
 		if plan.Request.Version != "" {
@@ -533,7 +660,9 @@ func (m *Model) planText() string {
 			lines = append(lines, "Verify: "+process.Display(*step.Verify))
 		}
 	}
-	lines = append(lines, "", "Native package-manager output will open in this terminal.", "Changes already made cannot be assumed rolled back if interrupted.")
+	if m.planExecutable() {
+		lines = append(lines, "", "Native package-manager output will open in this terminal.", "Changes already made cannot be assumed rolled back if interrupted.")
+	}
 	return strings.Join(lines, "\n")
 }
 

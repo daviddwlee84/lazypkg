@@ -23,6 +23,7 @@ type fakeService struct {
 	options                                  []domain.SetupOption
 	managerCalls, packageCalls, executeCalls int
 	packageArgs                              []string
+	queryRequests                            []domain.PackageQuery
 	requests                                 []domain.ActionRequest
 	setupIDs                                 []string
 	result                                   domain.ActionResult
@@ -37,10 +38,12 @@ func (f *fakeService) Managers(context.Context) ([]domain.Manager, error) {
 	f.managerCalls++
 	return f.managers, nil
 }
-func (f *fakeService) Packages(ctx context.Context, kind, query, manager string) (domain.Snapshot, error) {
+func (f *fakeService) Query(ctx context.Context, request domain.PackageQuery) (domain.Snapshot, error) {
+	kind, query, manager := request.Kind, request.Query, strings.Join(request.Managers, ",")
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.packageCalls++
+	f.queryRequests = append(f.queryRequests, request)
 	f.packageArgs = []string{kind, query, manager}
 	f.packageContext = ctx
 	return f.snapshot, nil
@@ -280,8 +283,14 @@ func TestDiscoverSubmitsCorrectServiceArguments(t *testing.T) {
 		t.Fatal("search ran synchronously")
 	}
 	deliver(m, cmd)
-	if strings.Join(f.packageArgs, "|") != "search|node|mise" {
-		t.Fatalf("wrong service query arguments: %#v", f.packageArgs)
+	found := false
+	for _, request := range f.queryRequests {
+		if request.Kind == "search" && request.Query == "node" && strings.Join(request.Managers, ",") == "mise" && request.DeferInventory {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("wrong service query arguments: %#v", f.queryRequests)
 	}
 	if m.modal != noModal {
 		t.Fatal("search submission unexpectedly opened details")
@@ -559,4 +568,23 @@ func (r *ackReader) Read(p []byte) (int, error) {
 	r.before()
 	p[0] = '\n'
 	return 1, nil
+}
+
+func (f *fakeService) Preferences(context.Context) (domain.ManagerPreferences, error) {
+	return domain.ManagerPreferences{Mouse: true, Groups: map[string][]string{"all": {"brew", "mise"}}, Sets: map[string][]string{}}, nil
+}
+func (f *fakeService) SaveManagerSet(_ context.Context, name string, ids []string, asDefault bool) (domain.ManagerPreferences, error) {
+	p, _ := f.Preferences(context.Background())
+	p.Sets[name] = append([]string(nil), ids...)
+	if asDefault {
+		p.Default = append([]string(nil), ids...)
+		p.DefaultSet = name
+	}
+	return p, nil
+}
+func (f *fakeService) CheckManagers(context.Context, []string, bool) ([]domain.ManagerHealth, error) {
+	return nil, nil
+}
+func (f *fakeService) PlanManagerUpdate(_ context.Context, id string) (domain.ActionPlan, error) {
+	return domain.ActionPlan{Title: "Update manager " + id, Kind: "manager-update"}, nil
 }

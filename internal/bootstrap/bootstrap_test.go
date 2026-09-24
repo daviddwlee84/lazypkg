@@ -117,6 +117,22 @@ func TestPlanNormalUVToolEnvironmentAndReadOnly(t *testing.T) {
 	}
 }
 
+func TestReadOnlyProbeDisablesMiseAutoInstallWithoutChangingOverlay(t *testing.T) {
+	e, r := fixture(t)
+	r.versions["shim"] = "mpm, version 8.0.1"
+	env := map[string]string{"PATH": "private", "MISE_AUTO_INSTALL": "1", "MISE_NOT_FOUND_AUTO_INSTALL": "true"}
+	if _, err := e.output(context.Background(), domain.Command{Path: "shim", Args: []string{"--version"}, Env: env}); err != nil {
+		t.Fatal(err)
+	}
+	got := r.outputs[0].Env
+	if got["PATH"] != "private" || got["MISE_AUTO_INSTALL"] != "0" || got["MISE_NOT_FOUND_AUTO_INSTALL"] != "false" {
+		t.Fatal(got)
+	}
+	if env["MISE_AUTO_INSTALL"] != "1" || env["MISE_NOT_FOUND_AUTO_INSTALL"] != "true" {
+		t.Fatal("probe mutated caller environment", env)
+	}
+}
+
 func TestResolveRejectsUntestedExistingVersionWithoutChangingIt(t *testing.T) {
 	e, r := fixture(t)
 	r.paths["mpm"] = "/fixture/mpm"

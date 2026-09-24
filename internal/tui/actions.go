@@ -20,7 +20,16 @@ func (m *Model) actions() []binding {
 		return nil
 	}
 	r, ok := m.selectedRow()
-	if !ok || r.pkg == nil {
+	if !ok {
+		return nil
+	}
+	if r.managerInfo != nil {
+		if r.managerInfo.Path != "" {
+			return []binding{{"u", "update manager", "manager-update"}}
+		}
+		return nil
+	}
+	if r.pkg == nil {
 		return nil
 	}
 	p := r.pkg
@@ -82,7 +91,13 @@ func (m *Model) requestAction(operation string) tea.Cmd {
 		return nil
 	}
 	r, ok := m.selectedRow()
-	if !ok || r.pkg == nil {
+	if !ok {
+		return nil
+	}
+	if operation == "manager-update" && r.managerInfo != nil {
+		return m.startManagerPlan(r.managerInfo.ID)
+	}
+	if r.pkg == nil {
 		return nil
 	}
 	p := r.pkg
@@ -193,7 +208,10 @@ func (m *Model) reviewSetup() tea.Cmd {
 
 func (m *Model) modalKey(key tea.KeyPressMsg) tea.Cmd {
 	name := key.String()
-	if m.modal == versionModal {
+	if m.modal == providersModal {
+		return m.providersKey(key)
+	}
+	if m.modal == versionModal || m.modal == saveSetModal {
 		return m.inputMessage(key)
 	}
 	if name == "esc" || name == "ctrl+c" {
@@ -224,7 +242,7 @@ func (m *Model) modalKey(key tea.KeyPressMsg) tea.Cmd {
 			return m.loadSetup()
 		}
 	case planModal:
-		if name == "y" && !key.IsRepeat && !m.planLoading && m.planErr == nil && !m.executing && m.width >= 40 && m.height >= 10 {
+		if name == "y" && !key.IsRepeat && !m.planLoading && m.planErr == nil && m.planExecutable() && !m.executing && m.width >= 40 && m.height >= 10 {
 			m.executing = true
 			runner := &execution{ctx: m.ctx, service: m.service, plan: m.plan}
 			generation := m.planGeneration
@@ -232,7 +250,11 @@ func (m *Model) modalKey(key tea.KeyPressMsg) tea.Cmd {
 		}
 		// Enter deliberately never approves a plan. The footer always names y explicitly.
 		if name == "enter" {
-			m.status = "Press y to execute this reviewed plan, or Esc to cancel."
+			if m.planExecutable() {
+				m.status = "Press y to execute this reviewed plan, or Esc to cancel."
+			} else {
+				m.status = "This update is guidance only; follow the documented owner instructions, or Esc back."
+			}
 			return nil
 		}
 	case detailsModal:
@@ -268,7 +290,19 @@ func (m *Model) modalKey(key tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
+func (m *Model) planExecutable() bool {
+	return m.plan.ManagerUpdate == nil || m.plan.ManagerUpdate.ApplySupported
+}
+
 func (m *Model) closeModal() {
+	if m.modal == saveSetModal {
+		if m.providerPicker.saving {
+			return
+		}
+		m.modal = providersModal
+		m.input.Blur()
+		return
+	}
 	if m.modal == setupModal {
 		if m.setup.cancel != nil {
 			m.setup.cancel()
@@ -291,6 +325,23 @@ func (m *Model) closeModal() {
 	m.input.Blur()
 }
 
+func (m *Model) startManagerPlan(id string) tea.Cmd {
+	if m.planCancel != nil {
+		m.planCancel()
+	}
+	ctx, cancel := context.WithCancel(m.ctx)
+	m.planCancel = cancel
+	m.planGeneration++
+	generation, service := m.planGeneration, m.service
+	m.planReturn = noModal
+	m.modal = planModal
+	m.modalOffset = 0
+	m.planLoading = true
+	m.planErr = nil
+	m.plan = domain.ActionPlan{}
+	return func() tea.Msg { plan, err := service.PlanManagerUpdate(ctx, id); return planMsg{generation, plan, err} }
+}
+
 func (m *Model) helpText() string {
 	lines := []string{
 		"Browse", "↑/↓ or j/k   Select an item", "Tab/Shift+Tab   Move focus between managers and items",
@@ -300,6 +351,7 @@ func (m *Model) helpText() string {
 		"", "Manage", "s   Set up the backend or additional managers", "e   Read errors and partial-coverage details", "v   View the last operation result",
 		"i   Install a Discover result", "u   Upgrade an installed package when supported", "x   Review removal; a   Review mise global activation", "d   Diagnose a package's first recorded command across all providers",
 		"Only applicable actions appear in the footer. Every change requires a plan and y to confirm.",
+		"", "Providers & mouse", "f   Choose groups or saved sets; Space/click loads a preset or toggles a manager", "[ / ]   Move a selected manager earlier/later in the picker priority order", "Enter applies the draft once; S saves a named set and can make it the default", "M   Toggle mouse capture; tabs, rows, visible buttons and checkboxes are clickable", "Wheel scrolls the hovered pane. Dragging off a button cancels the click.", "Managers: b toggles detected/all catalog; r forces update checks; u reviews an owner update",
 		"", "Scope", "Installed packages, recognized applications, and executables are different observations.",
 		"mise activation is directory-dependent. Configured/installed does not prove a PATH winner.",
 		"Diagnostics show the inherited process PATH. Shell aliases/functions are outside this scan.",
@@ -313,6 +365,12 @@ func (m *Model) issuesText() string {
 	var lines []string
 	if m.managersErr != nil {
 		lines = append(lines, "Manager discovery: "+m.managersErr.Error())
+	}
+	if m.healthErr != nil {
+		lines = append(lines, "Manager update check: "+m.healthErr.Error())
+	}
+	if m.prefsErr != nil {
+		lines = append(lines, "Provider preferences: "+m.prefsErr.Error())
 	}
 	for _, manager := range m.managers {
 		for _, err := range manager.Errors {
@@ -329,6 +387,13 @@ func (m *Model) issuesText() string {
 	}
 	for _, issue := range issues {
 		lines = append(lines, strings.TrimSpace(issue.Manager+": "+issue.Message))
+	}
+	if m.view == discoverView {
+		for _, coverage := range s.snapshot.InventoryCoverage {
+			if coverage.State != "complete" && coverage.State != "pending" {
+				lines = append(lines, coverage.Manager+" inventory: "+coverage.State+" "+coverage.Message)
+			}
+		}
 	}
 	if len(lines) == 0 {
 		lines = append(lines, "No errors reported for this view.")

@@ -9,11 +9,31 @@ prepares a reviewable plan, and verifies installation state after mutation.
 Ownership enrichment is optional evidence and must not decide whether an
 installation succeeded. A manager read error is not an empty inventory.
 
+`domain.PackageQuery` is the CLI/TUI selection contract. An explicit manager
+list, built-in group or saved ordered set selects providers; environment and
+unknown scopes are excluded from package operations. `internal/catalog` embeds
+all 149 pinned adapters and their exact capabilities. Its Python generator reads
+static metadata only; runtime discovery probes supported platforms with a
+five-second native timeout per manager. Scope policy lives in the generator.
+Public `uv` aliases `uvx`; `uv-pip` names mpm's environment-specific `uv` adapter.
+
+Inventory coverage records complete/failed/unavailable/unsupported/excluded
+states, manager instance and observation time. The service caches inventory for
+60 seconds and detection for five seconds. Mutations invalidate a cache epoch;
+request timestamps prevent older concurrent reads from overwriting newer ones.
+Discover matches provider + normalized package ID + instance, retaining all
+installed versions without comparing them to the remote version. Same-name PATH
+observations remain separate. Relevance precedes installed-source preference,
+which precedes the selected manager order. TUI inventory generations, cache age
+and stable candidate keys preserve selection as asynchronous joins finish.
+
 `internal/backend` owns the version-gated mpm boundary. JSON is a manager-keyed
 object with package records and per-manager errors, even when the process exits
 zero. Every call receives an explicit temporary JSON configuration. Query
 stdout/stderr are captured separately; mutations keep native terminal I/O.
 The adapter normalizes a known uvx 8.0.1 entrypoint parsing artifact.
+Its isolated mpm config fixes the Go adapter's version subcommand. Read probes
+disable mise auto-install and use local Go toolchains to avoid implicit downloads.
 Preview and mutation encode native IDs as manager-scoped pURLs, preserving
 Homebrew IDs such as `python@3.13` and npm scopes. Raw `name@version` would be
 reinterpreted by mpm. Public commands accept native IDs, not caller-provided
@@ -36,6 +56,27 @@ to temporary files, uses explicit interpreters, verifies the result, and
 continues independent steps after failures. Standalone mpm uses a pinned digest.
 New known executable directories enter later child environments only.
 
+`internal/maintenance` checks the selected manager executable, its owner,
+runtime and prefix. Its 24-hour cache binds those identities, requirements and
+configuration fingerprints; force refresh bypasses it. Update plans are rebuilt
+and compared before execution, and include a precise target plus postchecks.
+Unknown ownership or configuration ambiguity yields guidance without writable
+steps. Compatibility failure does not prevent preparing a manager repair.
+
+The npm repair uses `aqua:npm/cli`, checks `engines.node` against both observed
+current and global Node runtimes, and chooses a stable compatible version in
+the existing npm major. It installs and verifies an independent package before
+pinning mise's global npm selection. Original Node/npm files remain intact.
+The recipe is enabled on macOS/Linux; Windows npm gets guidance. Other recipes
+require owner evidence, such as Homebrew formula paths plus metadata or a uv
+standalone receipt; Cargo/rustup proxies and recognized package records alone
+are not ownership proof.
+
+Configuration saves preserve unrelated TOML content and file permissions, with
+digest checks, a cooperative lock and atomic replacement. Mouse hit targets
+share the rendered layout, and press/release identity checks prevent stale
+coordinates or overlay fall-through from approving an action.
+
 `internal/process` is the shared executable/argv boundary. It applies explicit
 environment overlays, bounds captured output and resolves executables against
 the child PATH. No plan preview is evaluated as shell code.
@@ -50,5 +91,6 @@ the child PATH. No plan preview is evaluated as shell code.
 - [mise configuration selection](https://mise.jdx.dev/configuration.html)
 
 Future mpm version support requires updating contract fixtures and testing the
-native commands. Package-manager minimum versions are reported by mpm, not
+native commands, pinned generator dependencies and embedded catalog. CI runs
+the generator in check mode. Package-manager minimum versions are reported by mpm, not
 inferred merely from executable presence.

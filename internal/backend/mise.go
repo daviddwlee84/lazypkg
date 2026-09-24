@@ -31,7 +31,9 @@ func (m Mise) output(ctx context.Context, args ...string) (process.Result, error
 	}
 	ctx, cancel := context.WithTimeout(ctx, d)
 	defer cancel()
-	return m.Runner.Output(ctx, m.Command(args...))
+	c := m.Command(args...)
+	c.Env = readOnlyEnv(c.Env)
+	return m.Runner.Output(ctx, c)
 }
 
 // A --global listing still resolves tools in the current project first. Read
@@ -62,6 +64,7 @@ func (m Mise) globalOutput(ctx context.Context, args ...string) (process.Result,
 		}
 	}
 	c.Env["MISE_CEILING_PATHS"] = canonical
+	c.Env = readOnlyEnv(c.Env)
 	d := m.Timeout
 	if d <= 0 {
 		d = 30 * time.Second

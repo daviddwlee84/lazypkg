@@ -252,6 +252,15 @@ func (e *Engine) ResolveMPM(ctx context.Context) (string, error) {
 func (e *Engine) output(ctx context.Context, c domain.Command) (process.Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
+	// A discovered manager may itself be a mise shim. Read-only setup and
+	// backend detection must not install the shim's missing runtime.
+	env := make(map[string]string, len(c.Env)+2)
+	for k, v := range c.Env {
+		env[k] = v
+	}
+	env["MISE_AUTO_INSTALL"] = "0"
+	env["MISE_NOT_FOUND_AUTO_INSTALL"] = "false"
+	c.Env = env
 	return e.Runner.Output(ctx, c)
 }
 

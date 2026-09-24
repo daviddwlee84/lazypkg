@@ -55,7 +55,7 @@ func (e *Engine) query(ctx context.Context, executable string, args ...string) (
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 	r, err := e.Runner.Output(ctx, domain.Command{Path: executable, Args: args, Dir: e.Dir,
-		Env: map[string]string{"PATH": e.Path, "PATHEXT": e.PathExt, "LC_ALL": "C", "LANG": "C", "NO_COLOR": "1", "HOMEBREW_NO_AUTO_UPDATE": "1", "HOMEBREW_NO_ANALYTICS": "1", "MISE_AUTO_INSTALL": "0"}})
+		Env: map[string]string{"PATH": e.Path, "PATHEXT": e.PathExt, "LC_ALL": "C", "LANG": "C", "NO_COLOR": "1", "HOMEBREW_NO_AUTO_UPDATE": "1", "HOMEBREW_NO_ANALYTICS": "1", "MISE_AUTO_INSTALL": "0", "MISE_NOT_FOUND_AUTO_INSTALL": "false"}})
 	return r.Stdout, err
 }
 

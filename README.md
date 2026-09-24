@@ -5,9 +5,10 @@ installed, choose an installation source, and understand which executable PATH
 will find. Go provides the CLI/TUI; [Meta Package Manager](https://mpm.run/)
 provides most package operations.
 
-This is an unreleased development version targeting macOS, Windows and Linux.
-Native macOS read-only checks and an isolated uv tool install/remove workflow
-are part of local verification. Windows/Linux native installer and terminal
+The current local release is **v0.1.1**, targeting macOS, Windows and Linux.
+Native macOS read-only checks, an isolated uv tool lifecycle and an isolated
+mise/npm manager repair are part of local verification. Windows/Linux native
+installer and terminal
 acceptance must be run on those platforms; cross-compilation is not that proof.
 
 ## Run from this checkout
@@ -48,6 +49,10 @@ usable width. Manager filters, selection and queries survive view changes.
 | `↑/↓`, `j/k`, `gg/G` | Select / first / last item |
 | `←/→`, `h/l`, `1`–`5` | Switch view |
 | `Tab`, `Shift+Tab` | Switch manager/list focus |
+| `f` | Choose managers, built-in groups or saved ordered sets |
+| `[` / `]`, `S` in the picker | Reorder managers / save a named set |
+| `b` in Managers | Toggle detected managers / full platform catalog |
+| `M` | Toggle mouse support |
 | `/` | Filter locally; in Discover, type and Enter to search |
 | `Enter` | Details / accept filter |
 | `i`, `u`, `x` | Review install, upgrade, removal when supported |
@@ -62,6 +67,20 @@ released, then an acknowledgement returns to the dashboard. Views remain
 usable during reads; failed providers do not erase their previously shown
 installed records.
 
+Mouse support is enabled by default: click tabs, rows, manager filters and
+overlay controls, or scroll with the wheel. Use `--mouse=false` or `mouse = false`
+in configuration to disable it. In Managers, `u` reviews a manager update and
+`r` refreshes detection and update checks. Opening Managers starts update checks
+in the background; cached results last 24 hours and show their observation time.
+
+Discover joins search results with inventory by provider, package ID and manager
+instance. The installed and available versions do not need to match. It shows
+installed versions, not installed via that provider, checking, failed or stale
+inventory separately. A same-name command in PATH is another observation; it
+does not establish which search result installed it. Missing catalog versions
+are shown as “not reported by provider.” At equal search relevance, current
+installed sources rank first, followed by your chosen manager order.
+
 ## Scriptable commands
 
 Examples below use a built `lazypkg` executable; `go run ./cmd/lazypkg` is equivalent.
@@ -69,6 +88,10 @@ Examples below use a built `lazypkg` executable; `go run ./cmd/lazypkg` is equiv
 ```sh
 lazypkg list --json
 lazypkg list --manager brew
+lazypkg list --manager brew,mise,uvx
+lazypkg list --group rust
+lazypkg sets save daily --manager brew,mise,uvx --default
+lazypkg search ripgrep --set daily
 lazypkg search ripgrep
 lazypkg install ripgrep --manager brew --dry-run
 lazypkg install ripgrep --manager brew --yes
@@ -77,13 +100,20 @@ lazypkg upgrade ripgrep --manager brew --dry-run
 lazypkg remove ripgrep --manager brew --dry-run
 lazypkg diagnose rg --json
 lazypkg managers --json
+lazypkg managers --detected --json
+lazypkg managers check npm --refresh
+lazypkg managers upgrade npm --dry-run
+lazypkg managers upgrade npm --yes
 lazypkg setup --json                 # list setup choices without a prompt
 lazypkg setup mpm mise --dry-run
 lazypkg setup mpm --yes
 lazypkg completion zsh
 ```
 
-`--manager` is mandatory for package mutations. `--json` keeps stdout free of
+Queries accept repeated/comma-separated `--manager`, one `--group`, or one `--set`;
+these selectors are mutually exclusive. Explicit manager and saved-set order is
+preserved. Package mutations require exactly one `--manager`. `--json` keeps
+stdout free of
 native command logs. Non-interactive mutation requires `--yes`; `--dry-run`
 performs read queries but applies no changes. Native managers may still require
 a real terminal for credentials. Exit codes: 0 success, 1 runtime failure,
@@ -110,10 +140,19 @@ rather than using mpm's `--purge` behavior; global Scoop removal is not exposed.
 
 ## Coverage and evidence
 
-The supported core includes Homebrew formulae/casks, apt, WinGet, Scoop,
-Chocolatey, npm globals, uv tools, Cargo and mise. DNF, pacman, Flatpak, Snap
-and pipx use the same mpm boundary. A detected manager must also satisfy mpm's
-version requirement; unsupported actions remain unavailable.
+The embedded catalog covers **all 149 adapters in mpm 8.0.1**, including 144
+maintained adapters. Detection probes every adapter supported on the current
+platform, including Go, RubyGems, Cargo and rustup. Detection alone does not
+enable package operations: global/user scope is currently verified for 18
+adapters (Homebrew formulae/casks, apt, DNF, pacman, WinGet, Scoop, Chocolatey,
+npm, uv tools, pipx, Cargo, Go, RubyGems, rustup, mise, Flatpak and Snap).
+Environment-specific and unknown scopes remain visible but passive, even if
+explicitly selected. A detected manager must also satisfy mpm's minimum version;
+its requirement, incompatibility reason and exact capabilities appear in details.
+
+Built-in groups include `system`, `runtimes`, `python`, `node`, `ruby`, `rust`,
+`go`, `debian`, `rpm`, `arch`, `global`, `environment`, `unknown` and `all`.
+Groups describe catalog membership; they do not bypass the scope policy.
 
 - **Global scope:** no project dependency/venv scan or inactive npm-context sweep.
   System inventories may include libraries and dependencies as well as CLI tools.
@@ -123,6 +162,10 @@ version requirement; unsupported actions remain unavailable.
   8.0.1 parsing artifact that treats entrypoint lines beginning with `v` as
   packages named `-`.
 - **Cargo:** inventory/search/install/remove; no mpm update support.
+- **Go:** inventory/install; the adapter recognizes binaries via Go build
+  metadata in GOBIN/GOPATH. This does not prove they were installed with `go install`.
+  The pinned adapter's version probe is corrected to `go version` through mpm's
+  configuration override.
 - **Missing managers:** no remote catalog is invented for a manager that is not
   installed. Search coverage and failures remain visible.
 - **Provenance:** recorded ownership, recognized/manageable software, inferred
@@ -137,6 +180,30 @@ version requirement; unsupported actions remain unavailable.
   repair. Cargo nonstandard configured roots and unsupported ownership sources
   can remain unknown. Reads are bounded and partial coverage is reported.
 
+## Manager compatibility and updates
+
+`managers check` checks the selected executable and its proven installation
+owner. It distinguishes available updates, current, unknown, failed and cached
+observations. Supported reviewed recipes cover an owning Homebrew formula,
+Homebrew itself, receipt-backed standalone uv, self-update-capable mise, Scoop
+core, and the independent mise/npm repair below. Unsupported or ambiguous
+ownership produces guidance instead of an executable update plan. WinGet/App
+Installer updates use official guidance. Opening the dashboard never upgrades
+a manager automatically.
+
+For example, **npm 11.6.2 is below mpm 8.0.1's minimum of 11.10.0**, which added
+`min-release-age`. This is an adapter requirement, not a mismatch between Node's
+and npm's version numbers. On macOS/Linux, the preferred repair for npm bundled
+with a mise Node installation is an independently managed `aqua:npm/cli` version.
+The check chooses the newest stable version in the current npm major that meets
+the mpm minimum and the observed current/global Node `engines.node` constraints.
+The plan names its config file and reviews `mise install` followed by
+`mise use --global --pin`. It keeps Node and its bundled npm/wrappers intact,
+verifies the independent install before changing global selection, and verifies
+the selected result afterward. Project overrides may still take precedence.
+If compatibility or ownership cannot be proved, the UI explains alternatives.
+The current Aqua recipe is not applied on Windows.
+
 ## Configuration
 
 No config file is required. On macOS/Linux, use
@@ -150,6 +217,13 @@ explicitly; a missing explicit file is an error.
 timeout_seconds = 30
 # Optional default query selection; an explicit --manager overrides it:
 # managers = ["brew", "cask", "mise", "uvx"]
+mouse = true
+manager_order = ["brew", "mise", "uvx", "cargo"]
+default_manager_set = "daily"
+
+[manager_sets]
+daily = ["brew", "mise", "uvx"]
+languages = ["mise", "cargo", "rustup", "go", "gem", "npm", "uvx"]
 ```
 
 `lazypkg config show` prints effective paths/settings. Explicit flags override
@@ -157,8 +231,17 @@ timeout_seconds = 30
 `$XDG_DATA_HOME/lazypkg` (default `~/.local/share/lazypkg`) or
 `%LOCALAPPDATA%\lazypkg\data`. Relative XDG variables are ignored.
 
+Named sets take precedence over the legacy `managers` default. `manager_order`
+orders built-in groups and the default catalog selection; explicit lists and
+saved sets use their own order. Saving a set preserves unrelated configuration
+and detects concurrent edits. Manager health caches live in
+`$XDG_CACHE_HOME/lazypkg` (default `~/.cache/lazypkg`) or
+`%LOCALAPPDATA%\lazypkg\cache` and can be bypassed with `--refresh`.
+
 lazypkg isolates mpm's own configuration and `MPM_*` overrides. Native managers
-retain their user configuration. New setup paths are added only to later child
+retain their user configuration. Read-only probes disable mise automatic
+installation; Go probes use `GOTOOLCHAIN=local` to avoid implicit downloads.
+New setup paths are added only to later child
 process environments; existing project/runtime PATH entries are retained.
 
 ## Development and verification
@@ -171,6 +254,7 @@ go build ./cmd/lazypkg
 python3 scripts/pty_smoke.py
 # Optional native checks in disposable environments (requires installed tools):
 python3 scripts/integration_uv.py --mpm /absolute/path/to/mpm
+python3 scripts/integration_manager_npm.py --mpm /absolute/path/to/mpm --mise /absolute/path/to/mise --node /absolute/path/to/node
 LAZYPKG_TEST_MISE=/absolute/path/to/mise go test ./internal/backend -run TestMiseLiveGlobalScope -v
 ```
 
@@ -178,6 +262,23 @@ The PTY script is POSIX-only and uses a fake service with temporary receipts;
 it does not install software. Unit tests use fake runners, temporary files and
 HTTP fixtures. CI runs tests/builds on macOS, Ubuntu and Windows, and the PTY
 check on macOS/Linux.
+
+The catalog is generated from pinned Python dependencies during development,
+then embedded in Go. Regenerate it in a disposable virtual environment:
+
+```sh
+python3 -m venv /tmp/lazypkg-catalog
+/tmp/lazypkg-catalog/bin/python -m pip install -r scripts/catalog-requirements.txt
+/tmp/lazypkg-catalog/bin/python scripts/generate_catalog.py
+/tmp/lazypkg-catalog/bin/python scripts/generate_catalog.py --check
+```
+
+To add an upstream adapter, update the pinned mpm version, full dependency lock
+and catalog together. To enable a detected adapter for package operations,
+verify its inventory/mutation scope and capabilities, update the generator's
+scope policy and add contract/native verification. Unknown scope is passive
+until reviewed; manually editing generated JSON is not the maintenance path.
+CI checks the generated artifact against the pinned environment.
 
 There are no published lazypkg releases or verified package-manager recipes
 yet. Rebuild this checkout to update a development binary. An application

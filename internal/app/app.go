@@ -11,7 +11,6 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -21,17 +20,25 @@ import (
 	"github.com/daviddwlee84/lazypkg/internal/config"
 	"github.com/daviddwlee84/lazypkg/internal/diagnostics"
 	"github.com/daviddwlee84/lazypkg/internal/domain"
+	"github.com/daviddwlee84/lazypkg/internal/maintenance"
 	"github.com/daviddwlee84/lazypkg/internal/process"
 )
 
 type App struct {
-	Config     config.Config
-	Runner     process.Runner
-	Bootstrap  *bootstrap.Engine
-	HTTPClient *http.Client
-	mu         sync.Mutex
-	mpm        *backend.MPM
-	writeMu    sync.Mutex
+	Config         config.Config
+	Runner         process.Runner
+	Bootstrap      *bootstrap.Engine
+	HTTPClient     *http.Client
+	mu             sync.Mutex
+	mpm            *backend.MPM
+	writeMu        sync.Mutex
+	cacheMu        sync.Mutex
+	inventory      map[string]domain.Snapshot
+	managerCache   []domain.Manager
+	managerCacheAt time.Time
+	cacheEpoch     uint64
+	maintenance    *maintenance.Engine
+	maintenanceEnv map[string]string
 }
 
 func New(c config.Config) *App {
@@ -50,169 +57,9 @@ func (a *App) provider(ctx context.Context) (*backend.MPM, error) {
 		}
 	}
 	if a.mpm == nil || a.mpm.Path != path {
-		a.mpm = &backend.MPM{Path: path, Runner: a.Runner, Timeout: a.Config.Timeout(), Env: a.Bootstrap.ChildEnv()}
+		a.mpm = &backend.MPM{Path: path, Runner: a.Runner, Timeout: a.Config.Timeout(), Env: a.childEnvLocked()}
 	}
 	return a.mpm, nil
-}
-func (a *App) Managers(ctx context.Context) ([]domain.Manager, error) {
-	for _, id := range a.Config.Managers {
-		if !backend.Known(backend.NormalizeManager(id)) {
-			return nil, fmt.Errorf("configuration contains unsupported manager %q", id)
-		}
-	}
-	m, err := a.provider(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return m.Managers(ctx)
-}
-func (a *App) mise() (backend.Mise, error) {
-	path, err := a.Bootstrap.Lookup("mise")
-	return backend.Mise{Path: path, Runner: a.Runner, Env: a.Bootstrap.ChildEnv(), Timeout: a.Config.Timeout()}, err
-}
-func (a *App) enabled(id string) bool {
-	if len(a.Config.Managers) == 0 {
-		return true
-	}
-	for _, m := range a.Config.Managers {
-		if backend.NormalizeManager(m) == id {
-			return true
-		}
-	}
-	return false
-}
-func (a *App) Packages(ctx context.Context, kind, query, manager string) (domain.Snapshot, error) {
-	return a.packages(ctx, kind, query, manager, true)
-}
-func (a *App) packages(ctx context.Context, kind, query, manager string, enrich bool) (domain.Snapshot, error) {
-	s := domain.Snapshot{Packages: []domain.Package{}, ObservedAt: time.Now()}
-	if kind != "installed" && kind != "search" && kind != "outdated" {
-		return s, fmt.Errorf("unknown query %q", kind)
-	}
-	manager = backend.NormalizeManager(manager)
-	if manager != "" && !backend.Known(manager) {
-		return s, fmt.Errorf("unsupported manager %q", manager)
-	}
-	if kind == "search" {
-		query = strings.TrimSpace(query)
-		if query == "" {
-			return s, fmt.Errorf("search query is required")
-		}
-		if strings.ContainsAny(query, "\x00\r\n\"`$;&|<>%!") {
-			return s, fmt.Errorf("query contains shell metacharacters unsupported by downstream managers")
-		}
-	}
-	managers, err := a.Managers(ctx)
-	if err != nil {
-		return s, err
-	}
-	mpm, err := a.provider(ctx)
-	if err != nil {
-		return s, err
-	}
-	targets := []domain.Manager{}
-	found := false
-	for _, m := range managers {
-		if manager != "" && manager != m.ID {
-			continue
-		}
-		if manager == "" && !a.enabled(m.ID) {
-			continue
-		}
-		found = true
-		if !m.Available {
-			if manager != "" || m.Path != "" {
-				s.Issues = append(s.Issues, domain.Issue{Manager: m.ID, Message: m.Status + ": " + strings.Join(m.Errors, "; ")})
-			}
-			continue
-		}
-		if !m.Supports(kind) {
-			s.Issues = append(s.Issues, domain.Issue{Manager: m.ID, Message: "does not support " + kind})
-			continue
-		}
-		targets = append(targets, m)
-	}
-	if manager != "" && !found {
-		return s, fmt.Errorf("%s is not supported on this platform", manager)
-	}
-	type reply struct {
-		s   domain.Snapshot
-		err error
-		id  string
-	}
-	ch := make(chan reply, len(targets))
-	sem := make(chan struct{}, 4)
-	for _, m := range targets {
-		go func(m domain.Manager) {
-			select {
-			case sem <- struct{}{}:
-			case <-ctx.Done():
-				ch <- reply{err: ctx.Err(), id: m.ID}
-				return
-			}
-			defer func() { <-sem }()
-			var r domain.Snapshot
-			var err error
-			if m.ID == "mise" && kind != "search" {
-				var mi backend.Mise
-				mi, err = a.mise()
-				if err == nil {
-					if kind == "installed" {
-						r, err = mi.Installed(ctx)
-					} else {
-						r, err = mi.Outdated(ctx)
-					}
-				}
-			} else if m.ID == "uvx" && kind == "search" {
-				r, err = backend.PyPIExact(ctx, a.HTTPClient, "", query)
-			} else {
-				backendQuery := ""
-				if kind == "search" {
-					backendQuery = query
-				}
-				r, err = mpm.Packages(ctx, kind, backendQuery, m.ID)
-			}
-			ch <- reply{s: r, err: err, id: m.ID}
-		}(m)
-	}
-	for range targets {
-		r := <-ch
-		if r.err != nil {
-			s.Issues = append(s.Issues, domain.Issue{Manager: r.id, Message: r.err.Error()})
-		}
-		s.Packages = append(s.Packages, r.s.Packages...)
-		s.Issues = append(s.Issues, r.s.Issues...)
-	}
-	if err := ctx.Err(); err != nil {
-		return s, err
-	}
-	if kind == "installed" && enrich {
-		engine := a.diagnosticEngine()
-		var issues []domain.Issue
-		s.Packages, issues = engine.Enrich(ctx, s.Packages)
-		s.Issues = append(s.Issues, issues...)
-	}
-	if kind != "search" && query != "" {
-		filtered := s.Packages[:0]
-		q := strings.ToLower(query)
-		for _, p := range s.Packages {
-			if strings.Contains(strings.ToLower(p.ID+" "+p.Name+" "+strings.Join(p.Commands, " ")), q) {
-				filtered = append(filtered, p)
-			}
-		}
-		s.Packages = filtered
-	}
-	sort.Slice(s.Packages, func(i, j int) bool {
-		p, q := s.Packages[i], s.Packages[j]
-		if p.ID != q.ID {
-			return p.ID < q.ID
-		}
-		if p.Manager != q.Manager {
-			return p.Manager < q.Manager
-		}
-		return p.Version < q.Version
-	})
-	return s, nil
 }
 func (a *App) Diagnose(ctx context.Context, name string) (domain.DiagnosticReport, error) {
 	s, err := a.Packages(ctx, "installed", "", "")
@@ -282,11 +129,34 @@ func (a *App) Plan(ctx context.Context, req domain.ActionRequest) (domain.Action
 	if selected == nil || !selected.Available {
 		return p, fmt.Errorf("%s is unavailable; inspect lazypkg managers or setup", req.Manager)
 	}
+	if selected.Scope != "" && selected.Scope != "global" {
+		return p, fmt.Errorf("%s has %s scope; package mutations are not enabled in the global/user view", req.Manager, selected.Scope)
+	}
 	if !selected.Supports(req.Operation) {
 		return p, fmt.Errorf("%s does not support %s", req.Manager, req.Operation)
 	}
 	if req.Operation == "install" && req.Manager != "mise" {
-		inventory, e := a.packages(ctx, "installed", req.Package, "", false)
+		ids, selectionErr := a.settings().Select(domain.PackageQuery{})
+		if selectionErr != nil {
+			return p, selectionErr
+		}
+		detected := map[string]bool{}
+		for _, m := range managers {
+			detected[m.ID] = m.Path != ""
+		}
+		active := make([]string, 0, len(ids)+1)
+		included := false
+		for _, id := range ids {
+			if !detected[id] && id != req.Manager {
+				continue
+			}
+			active = append(active, id)
+			included = included || id == req.Manager
+		}
+		if !included {
+			active = append(active, req.Manager)
+		}
+		inventory, e := a.read(ctx, domain.PackageQuery{Kind: "installed", Query: req.Package, Managers: active, Refresh: true}, false, false)
 		if e != nil {
 			p.Warnings = append(p.Warnings, "Existing installations could not be checked: "+e.Error())
 		}
@@ -405,11 +275,24 @@ func (a *App) Execute(ctx context.Context, p domain.ActionPlan, in io.Reader, ou
 		return domain.ActionResult{}, fmt.Errorf("another operation is already running")
 	}
 	defer a.writeMu.Unlock()
+	if p.Kind == "manager" {
+		engine := a.maintenanceEngine()
+		result, err := engine.Execute(ctx, p, in, out, errout)
+		a.mu.Lock()
+		a.maintenanceEnv = mergeEnvironment(a.maintenanceEnv, engine.ChildEnv())
+		a.mpm = nil
+		a.maintenance = nil
+		a.mu.Unlock()
+		a.invalidateInventory()
+		return result, err
+	}
 	if p.Kind == "setup" {
 		r, e := a.Bootstrap.Execute(ctx, p, in, out, errout)
 		a.mu.Lock()
 		a.mpm = nil
+		a.maintenance = nil
 		a.mu.Unlock()
+		a.invalidateInventory()
 		return r, e
 	}
 	if p.Kind != "package" {
@@ -454,6 +337,7 @@ func (a *App) Execute(ctx context.Context, p domain.ActionPlan, in io.Reader, ou
 	defer done()
 	fmt.Fprintln(out, p.Preview)
 	err = a.Runner.Run(ctx, c, in, out, errout)
+	a.invalidateInventory()
 	r := domain.ActionResult{Steps: []domain.StepResult{{ID: "package", Status: "failed"}}, Message: "Operation failed; refresh inventory to inspect any partial changes."}
 	if err != nil {
 		return r, err
@@ -548,7 +432,7 @@ func (r environmentRunner) Run(ctx context.Context, c domain.Command, in io.Read
 	return r.Runner.Run(ctx, r.command(c), in, out, errout)
 }
 func (a *App) diagnosticEngine() *diagnostics.Engine {
-	env := a.Bootstrap.ChildEnv()
+	env := a.childEnv()
 	e := diagnostics.New(environmentRunner{a.Runner, env})
 	if p, ok := env["PATH"]; ok {
 		e.Path = p

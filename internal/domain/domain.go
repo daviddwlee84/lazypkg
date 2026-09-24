@@ -11,15 +11,23 @@ import (
 const MPMVersion = "8.0.1"
 
 type Manager struct {
-	ID           string   `json:"id"`
-	Name         string   `json:"name"`
-	Path         string   `json:"path,omitempty"`
-	Version      string   `json:"version,omitempty"`
-	Supported    bool     `json:"supported"`
-	Available    bool     `json:"available"`
-	Status       string   `json:"status"`
-	Capabilities []string `json:"capabilities"`
-	Errors       []string `json:"errors,omitempty"`
+	ID           string         `json:"id"`
+	BackendID    string         `json:"backend_id,omitempty"`
+	Name         string         `json:"name"`
+	Path         string         `json:"path,omitempty"`
+	Version      string         `json:"version,omitempty"`
+	Supported    bool           `json:"supported"`
+	Available    bool           `json:"available"`
+	Status       string         `json:"status"`
+	Capabilities []string       `json:"capabilities"`
+	Errors       []string       `json:"errors,omitempty"`
+	Requirement  string         `json:"requirement,omitempty"`
+	Reason       string         `json:"reason,omitempty"`
+	Scope        string         `json:"scope,omitempty"`
+	Groups       []string       `json:"groups,omitempty"`
+	Maintained   bool           `json:"maintained"`
+	SourceURL    string         `json:"source_url,omitempty"`
+	Health       *ManagerHealth `json:"health,omitempty"`
 }
 
 func (m Manager) Supports(op string) bool {
@@ -37,35 +45,65 @@ type Evidence struct {
 	Detail string `json:"detail"`
 }
 type Package struct {
-	Manager         string     `json:"manager"`
-	ID              string     `json:"id"`
-	Name            string     `json:"name,omitempty"`
-	Version         string     `json:"version,omitempty"`
-	Latest          string     `json:"latest,omitempty"`
-	LatestInstalled bool       `json:"latest_installed,omitempty"`
-	Description     string     `json:"description,omitempty"`
-	Scope           string     `json:"scope"`
-	Root            string     `json:"root,omitempty"`
-	Commands        []string   `json:"commands,omitempty"`
-	ExecutablePaths []string   `json:"executable_paths,omitempty"`
-	Evidence        []Evidence `json:"evidence,omitempty"`
-	Active          bool       `json:"active,omitempty"`
-	Global          bool       `json:"global,omitempty"`
-	ConfigSource    string     `json:"config_source,omitempty"`
+	Manager           string       `json:"manager"`
+	ID                string       `json:"id"`
+	Name              string       `json:"name,omitempty"`
+	Version           string       `json:"version,omitempty"`
+	Latest            string       `json:"latest,omitempty"`
+	LatestInstalled   bool         `json:"latest_installed,omitempty"`
+	Description       string       `json:"description,omitempty"`
+	Scope             string       `json:"scope"`
+	Root              string       `json:"root,omitempty"`
+	Commands          []string     `json:"commands,omitempty"`
+	ExecutablePaths   []string     `json:"executable_paths,omitempty"`
+	Evidence          []Evidence   `json:"evidence,omitempty"`
+	Active            bool         `json:"active,omitempty"`
+	Global            bool         `json:"global,omitempty"`
+	ConfigSource      string       `json:"config_source,omitempty"`
+	Instance          string       `json:"instance,omitempty"`
+	Candidate         bool         `json:"candidate,omitempty"`
+	InstallState      string       `json:"install_state,omitempty"`
+	InstalledVersions []string     `json:"installed_versions,omitempty"`
+	InventoryAt       time.Time    `json:"inventory_at,omitempty"`
+	InventoryStale    bool         `json:"inventory_stale,omitempty"`
+	PathMatches       []Executable `json:"path_matches,omitempty"`
 }
 
 func (p Package) Key() string {
+	if p.Candidate {
+		return strings.Join([]string{p.Manager, p.Instance, NormalizePackageID(p.Manager, p.ID)}, "\x00")
+	}
 	return strings.Join([]string{p.Manager, p.ID, p.Version, p.Scope, p.Root}, "\x00")
 }
 
 type Issue struct {
 	Manager string `json:"manager,omitempty"`
 	Message string `json:"message"`
+	Kind    string `json:"kind,omitempty"`
+}
+type Coverage struct {
+	Manager    string    `json:"manager"`
+	Instance   string    `json:"instance,omitempty"`
+	State      string    `json:"state"` // complete, failed, unavailable, unsupported, excluded, pending
+	ObservedAt time.Time `json:"observed_at"`
+	Stale      bool      `json:"stale,omitempty"`
+	Message    string    `json:"message,omitempty"`
+}
+type PackageQuery struct {
+	Kind           string   `json:"kind"`
+	Query          string   `json:"query,omitempty"`
+	Managers       []string `json:"managers,omitempty"`
+	Group          string   `json:"group,omitempty"`
+	Set            string   `json:"set,omitempty"`
+	Refresh        bool     `json:"refresh,omitempty"`
+	DeferInventory bool     `json:"defer_inventory,omitempty"`
 }
 type Snapshot struct {
-	Packages   []Package `json:"packages"`
-	Issues     []Issue   `json:"issues,omitempty"`
-	ObservedAt time.Time `json:"observed_at"`
+	Packages          []Package  `json:"packages"`
+	Issues            []Issue    `json:"issues,omitempty"`
+	ObservedAt        time.Time  `json:"observed_at"`
+	Coverage          []Coverage `json:"coverage,omitempty"`
+	InventoryCoverage []Coverage `json:"inventory_coverage,omitempty"`
 }
 type Executable struct {
 	Name         string     `json:"name"`
@@ -118,13 +156,51 @@ type Step struct {
 	GuideURL    string   `json:"guide_url,omitempty"`
 }
 type ActionPlan struct {
-	Kind     string        `json:"kind"`
-	Title    string        `json:"title"`
-	Request  ActionRequest `json:"request"`
-	Steps    []Step        `json:"steps"`
-	Warnings []string      `json:"warnings,omitempty"`
-	Preview  string        `json:"preview,omitempty"`
-	SetupIDs []string      `json:"setup_ids,omitempty"`
+	Kind          string         `json:"kind"`
+	Title         string         `json:"title"`
+	Request       ActionRequest  `json:"request"`
+	Steps         []Step         `json:"steps"`
+	Warnings      []string       `json:"warnings,omitempty"`
+	Preview       string         `json:"preview,omitempty"`
+	SetupIDs      []string       `json:"setup_ids,omitempty"`
+	ManagerUpdate *ManagerHealth `json:"manager_update,omitempty"`
+}
+
+type ManagerPreferences struct {
+	Default    []string            `json:"default"`
+	Order      []string            `json:"order"`
+	Sets       map[string][]string `json:"sets"`
+	Groups     map[string][]string `json:"groups"`
+	DefaultSet string              `json:"default_set,omitempty"`
+	Mouse      bool                `json:"mouse"`
+}
+type ManagerHealth struct {
+	Manager          string    `json:"manager"`
+	Path             string    `json:"path"`
+	Version          string    `json:"version"`
+	Requirement      string    `json:"requirement,omitempty"`
+	Compatible       bool      `json:"compatible"`
+	Reason           string    `json:"reason,omitempty"`
+	Owner            string    `json:"owner,omitempty"`
+	OwnerPackage     string    `json:"owner_package,omitempty"`
+	OwnerPath        string    `json:"owner_path,omitempty"`
+	Runtime          string    `json:"runtime,omitempty"`
+	RuntimePath      string    `json:"runtime_path,omitempty"`
+	RuntimeVersion   string    `json:"runtime_version,omitempty"`
+	Prefix           string    `json:"prefix,omitempty"`
+	Channel          string    `json:"channel,omitempty"`
+	Alternatives     []string  `json:"alternatives,omitempty"`
+	UpdateStatus     string    `json:"update_status"`
+	CandidateVersion string    `json:"candidate_version,omitempty"`
+	Strategy         string    `json:"strategy,omitempty"`
+	Recommendation   string    `json:"recommendation,omitempty"`
+	GuideURL         string    `json:"guide_url,omitempty"`
+	CheckedAt        time.Time `json:"checked_at"`
+	Cached           bool      `json:"cached,omitempty"`
+	Stale            bool      `json:"stale,omitempty"`
+	ApplySupported   bool      `json:"apply_supported"`
+	Fingerprint      string    `json:"fingerprint,omitempty"`
+	ConfigPath       string    `json:"config_path,omitempty"`
 }
 type StepResult struct {
 	ID      string `json:"id"`
@@ -148,7 +224,11 @@ type SetupOption struct {
 // callers must present Plan and collect approval before passing it to Execute.
 type Service interface {
 	Managers(context.Context) ([]Manager, error)
-	Packages(context.Context, string, string, string) (Snapshot, error)
+	Query(context.Context, PackageQuery) (Snapshot, error)
+	Preferences(context.Context) (ManagerPreferences, error)
+	SaveManagerSet(context.Context, string, []string, bool) (ManagerPreferences, error)
+	CheckManagers(context.Context, []string, bool) ([]ManagerHealth, error)
+	PlanManagerUpdate(context.Context, string) (ActionPlan, error)
 	Diagnose(context.Context, string) (DiagnosticReport, error)
 	Plan(context.Context, ActionRequest) (ActionPlan, error)
 	Execute(context.Context, ActionPlan, io.Reader, io.Writer, io.Writer) (ActionResult, error)

@@ -32,7 +32,7 @@ func TestPTYHelper(t *testing.T) {
 
 type ptyService struct{ *fakeService }
 
-func (f *ptyService) Packages(ctx context.Context, kind, query, manager string) (domain.Snapshot, error) {
+func (f *ptyService) Query(ctx context.Context, request domain.PackageQuery) (domain.Snapshot, error) {
 	timer := time.NewTimer(300 * time.Millisecond)
 	defer timer.Stop()
 	select {
@@ -40,7 +40,7 @@ func (f *ptyService) Packages(ctx context.Context, kind, query, manager string) 
 		return domain.Snapshot{}, ctx.Err()
 	case <-timer.C:
 	}
-	return f.fakeService.Packages(ctx, kind, query, manager)
+	return f.fakeService.Query(ctx, request)
 }
 
 func (f *ptyService) Execute(ctx context.Context, plan domain.ActionPlan, in io.Reader, out, errout io.Writer) (domain.ActionResult, error) {
