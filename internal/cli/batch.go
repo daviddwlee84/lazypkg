@@ -70,16 +70,14 @@ func batchUpgradeCommand(o *options) *cobra.Command {
 		if len(exact) > 0 {
 			request.Source = "explicit targets"
 			for _, target := range exact {
-				found := false
-				for _, p := range snapshot.Packages {
-					if p.Manager == target.manager && domain.NormalizePackageID(p.Manager, p.ID) == domain.NormalizePackageID(target.manager, target.id) {
-						request.Targets = append(request.Targets, p)
-						found = true
-					}
+				matches, err := domain.SelectPackageRecords(snapshot.Packages, target.manager, target.id, "")
+				if err != nil {
+					return err
 				}
-				if !found {
+				if len(matches) == 0 {
 					return fmt.Errorf("no verified installed record for %s:%s; inspect inventory coverage", target.manager, target.id)
 				}
+				request.Targets = append(request.Targets, matches...)
 			}
 		} else {
 			for _, p := range snapshot.Packages {
@@ -202,7 +200,16 @@ func ShowBatchPlan(w io.Writer, p domain.BatchUpgradePlan) {
 		if target == "" {
 			target = "not reported"
 		}
-		fmt.Fprintf(w, "  Installed: %s → candidate: %s\n", clean(observed), clean(target))
+		if entry.State == "current" {
+			fmt.Fprintf(w, "  Installed: %s · no available upgrade\n", clean(observed))
+		} else if entry.State == "planned" {
+			fmt.Fprintf(w, "  Installed: %s → candidate: %s\n", clean(observed), clean(target))
+		} else {
+			fmt.Fprintf(w, "  Selected version: %s\n", clean(observed))
+			if target != "not reported" {
+				fmt.Fprintf(w, "  Observed candidate: %s\n", clean(target))
+			}
+		}
 		if entry.State == "planned" {
 			if entry.Package.Manager == "mise" {
 				fmt.Fprintln(w, "  Version policy: exact mise target pinned; activation is a separate action.")

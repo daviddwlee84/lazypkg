@@ -8,61 +8,31 @@ import (
 	"github.com/daviddwlee84/lazypkg/internal/domain"
 )
 
-func TestInventoryExpirationUsesProviderObservationAge(t *testing.T) {
-	now := time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC)
-	for _, test := range []struct {
-		name        string
-		at          time.Time
-		wantExpired bool
-	}{
-		{"fresh", now.Add(-inventoryTTL + time.Nanosecond), false},
-		{"at boundary", now.Add(-inventoryTTL), true},
-		{"older", now.Add(-2 * inventoryTTL), true},
-		{"unknown time", time.Time{}, true},
-		{"clock moved backward", now.Add(time.Second), true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			cached := inventoryState{loaded: true, snapshot: domain.Snapshot{ObservedAt: now, Coverage: []domain.Coverage{{Manager: "brew", State: "complete", ObservedAt: test.at}}}}
-			cached.expire(now)
-			if cached.stale != test.wantExpired || cached.snapshot.Coverage[0].Stale != test.wantExpired {
-				t.Fatalf("got stale=%t, coverage stale=%t", cached.stale, cached.snapshot.Coverage[0].Stale)
-			}
-		})
-	}
-	cached := inventoryState{loaded: true, snapshot: domain.Snapshot{ObservedAt: now, Coverage: []domain.Coverage{{Manager: "brew", State: "complete", ObservedAt: now.Add(-2 * inventoryTTL)}, {Manager: "mise", State: "complete", ObservedAt: now}}}}
-	cached.expire(now)
-	if !cached.stale || !cached.snapshot.Coverage[0].Stale || cached.snapshot.Coverage[1].Stale {
-		t.Fatal("aggregate timestamp replaced provider age or marked a fresh provider stale")
-	}
-	legacy := inventoryState{loaded: true, snapshot: domain.Snapshot{ObservedAt: now.Add(-2 * inventoryTTL)}}
-	legacy.expire(now)
-	if !legacy.stale {
-		t.Fatal("inventory without coverage was cached indefinitely")
-	}
-}
-
-func TestExpiredInventoryRefetchesWithoutLosingCandidateSelection(t *testing.T) {
+func TestSessionInventoryRetainsObservationUntilManualRefresh(t *testing.T) {
 	m, f := extendedModel(t)
 	m.view = discoverView
 	s := &m.states[discoverView]
 	s.loaded = true
 	s.query = "herdr"
 	s.candidates = domain.Snapshot{Packages: []domain.Package{{Manager: "brew", ID: "herdr", Candidate: true}, {Manager: "mise", ID: "herdr", Candidate: true}}}
-	old := time.Now().Add(-2 * inventoryTTL)
+	old := time.Now().Add(-2 * time.Hour)
 	m.inventories[m.scopeKey()] = &inventoryState{loaded: true, snapshot: domain.Snapshot{ObservedAt: time.Now(), Packages: []domain.Package{{Manager: "brew", ID: "herdr", Version: "1"}}, Coverage: []domain.Coverage{{Manager: "brew", State: "complete", ObservedAt: old}, {Manager: "mise", State: "complete", ObservedAt: old}}}}
 	m.attachDiscover()
 	m.move(1)
 	selected := s.selected
-	command := m.ensureInventory(false)
+	if m.ensureInventory(false) != nil {
+		t.Fatal("elapsed time triggered an automatic inventory read")
+	}
+	command := m.ensureInventory(true)
 	if command == nil || !m.inventories[m.scopeKey()].loading {
-		t.Fatal("expired inventory did not schedule a new read")
+		t.Fatal("manual refresh did not schedule a read")
 	}
 	if m.ensureInventory(false) != nil {
 		t.Fatal("expired cache scheduled duplicate reads while pending")
 	}
 	for _, p := range s.snapshot.Packages {
-		if !p.InventoryStale {
-			t.Fatal("expired observation was still presented as fresh")
+		if p.InventoryStale {
+			t.Fatal("observation age changed its classification")
 		}
 	}
 	if s.selected != selected {
@@ -88,9 +58,9 @@ func TestFreshServiceObservationWinsOverOlderUICache(t *testing.T) {
 	s.loaded = true
 	s.query = "herdr"
 	s.candidates = domain.Snapshot{Packages: []domain.Package{{Manager: "brew", ID: "herdr", Candidate: true, InstallState: "installed", Version: "2", InstalledVersions: []string{"2"}, InventoryAt: time.Now(), Commands: []string{"new-command"}}}}
-	m.inventories[m.scopeKey()] = &inventoryState{loaded: true, snapshot: domain.Snapshot{Packages: []domain.Package{{Manager: "brew", ID: "herdr", Version: "1", Commands: []string{"old-command"}}}, Coverage: []domain.Coverage{{Manager: "brew", State: "complete", ObservedAt: time.Now().Add(-2 * inventoryTTL)}}}}
-	if m.ensureInventory(false) == nil {
-		t.Fatal("old UI cache did not refetch")
+	m.inventories[m.scopeKey()] = &inventoryState{loaded: true, snapshot: domain.Snapshot{Packages: []domain.Package{{Manager: "brew", ID: "herdr", Version: "1", Commands: []string{"old-command"}}}, Coverage: []domain.Coverage{{Manager: "brew", State: "complete", ObservedAt: time.Now().Add(-2 * time.Hour)}}}}
+	if m.ensureInventory(false) != nil {
+		t.Fatal("older observation unexpectedly triggered a read")
 	}
 	p := s.snapshot.Packages[0]
 	if p.Version != "2" || p.InventoryStale || strings.Join(p.Commands, ",") != "new-command" {
@@ -109,16 +79,16 @@ func TestFreshServiceObservationWinsOverOlderUICache(t *testing.T) {
 	}
 }
 
-func TestOldServiceObservationCannotAppearFreshWhileRefreshing(t *testing.T) {
+func TestUnverifiedServiceObservationDoesNotReplacePendingInventory(t *testing.T) {
 	m, _ := extendedModel(t)
 	m.view = discoverView
 	s := &m.states[discoverView]
 	s.loaded = true
 	s.query = "herdr"
-	s.candidates = domain.Snapshot{Packages: []domain.Package{{Manager: "brew", ID: "herdr", Candidate: true, InstallState: "installed", InstalledVersions: []string{"1"}, InventoryAt: time.Now().Add(-2 * inventoryTTL)}}}
+	s.candidates = domain.Snapshot{Packages: []domain.Package{{Manager: "brew", ID: "herdr", Candidate: true, InstallState: "installed", InstalledVersions: []string{"1"}, InventoryAt: time.Now().Add(-2 * time.Hour), InventoryStale: true}}}
 	m.ensureInventory(false)
-	if !s.snapshot.Packages[0].InventoryStale {
-		t.Fatal("expired service cache was relabeled as fresh during pending UI read")
+	if s.snapshot.Packages[0].InstallState != "checking" {
+		t.Fatal("unverified service seed replaced pending inventory observation")
 	}
 }
 

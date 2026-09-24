@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Reconcile Homebrew tap identities across inventory, Updates, Discover and
+  operations; preserve fully qualified native targets and expose source conflicts.
+- Replace checkbox rows with compact selection/restriction markers and separate
+  selection intent from live operation verification.
+- Reuse TUI observations for the session, warm Updates once at startup, and retain
+  paused batch results across navigation and cancelled previews.
 - Enable GitHub CLI extensions in global/user inventory, with native per-item
   update checks, bound upgrade/removal plans and local/pinned/modified guidance.
 - Add Installed/Updates multi-selection and filtered batch upgrades, a shared

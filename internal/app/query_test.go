@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -182,9 +184,10 @@ func TestInstallPreflightDoesNotWarnForUndetectedManagers(t *testing.T) {
 
 type enrichmentRunner struct {
 	actionRunner
-	cancel context.CancelFunc
-	cellar string
-	reads  int
+	cancel      context.CancelFunc
+	cellar      string
+	reads       int
+	cellarReads int
 }
 
 func (r *enrichmentRunner) Output(ctx context.Context, c domain.Command) (process.Result, error) {
@@ -193,15 +196,16 @@ func (r *enrichmentRunner) Output(ctx context.Context, c domain.Command) (proces
 	case strings.Contains(args, "managers"):
 		return process.Result{Stdout: `{"brew":{"id":"brew","available":true,"supported":true,"fresh":true,"executable":true,"cli_path":"brew","version":"4.6.0"}}`}, nil
 	case c.Path == "brew":
-		if r.cancel != nil {
-			r.cancel()
-			r.cancel = nil
-			return process.Result{}, ctx.Err()
-		}
 		if args == "--cellar" {
+			r.cellarReads++
+			if r.cellarReads == 2 && r.cancel != nil {
+				r.cancel()
+				r.cancel = nil
+				return process.Result{}, ctx.Err()
+			}
 			return process.Result{Stdout: r.cellar}, nil
 		}
-		return process.Result{Stdout: `{"formulae":[]}`}, nil
+		return process.Result{Stdout: `{"formulae":[{"name":"example","full_name":"example","tap":"homebrew/core","installed":[{"version":"1"}]}]}`}, nil
 	case strings.Contains(args, "installed"):
 		r.reads++
 		return process.Result{Stdout: `{"brew":{"packages":[{"id":"example","installed_version":"1"}],"errors":[]}}`}, nil
@@ -214,6 +218,13 @@ func TestCancellationDuringEnrichmentRetainsPublishedBase(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	r := &enrichmentRunner{cancel: cancel, cellar: t.TempDir()}
+	receipt := filepath.Join(r.cellar, "example", "1", "INSTALL_RECEIPT.json")
+	if err := os.MkdirAll(filepath.Dir(receipt), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(receipt, []byte(`{"source":{"tap":"homebrew/core"}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
 	a := testApp(t, r)
 	q := domain.PackageQuery{Kind: "installed", Managers: []string{"brew"}}
 	if _, err := a.Query(ctx, q); !errors.Is(err, context.Canceled) {

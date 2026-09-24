@@ -405,7 +405,7 @@ func TestMiseUpdateAlreadyInstalledOffersLatestActivation(t *testing.T) {
 	}{
 		{"pending update activation", updatesView, true, false, "22.2.0"},
 		{"ordinary update", updatesView, false, true, "22.1.0"},
-		{"installed row keeps its version", installedView, true, true, "22.1.0"},
+		{"installed row keeps its version", installedView, true, false, "22.1.0"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			m, f := readyModel(t)
@@ -426,7 +426,7 @@ func TestMiseUpdateAlreadyInstalledOffersLatestActivation(t *testing.T) {
 			if hasUpgrade != test.wantUpgrade {
 				t.Fatalf("upgrade availability: got %t, want %t", hasUpgrade, test.wantUpgrade)
 			}
-			if !test.wantUpgrade {
+			if !test.wantUpgrade && test.view == updatesView {
 				if press(m, "u") != nil || len(f.requests) != 0 {
 					t.Fatal("pending activation scheduled another upgrade")
 				}

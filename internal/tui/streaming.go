@@ -156,10 +156,14 @@ func (m *Model) acceptStreamEvent(msg streamEventMsg) tea.Cmd {
 			m.publishStreamInventory(s)
 		}
 	}
-	if done {
-		return nil
+	var warm tea.Cmd
+	if msg.target.inventoryKey != "" && m.inventories[msg.target.inventoryKey] == m.inventories[m.scopeKey()] || msg.target.inventoryKey == "" && msg.target.view == installedView && m.states[installedView].scopeKey == m.scopeKey() {
+		warm = m.installedProgress(event, done)
 	}
-	return readStream(msg.streamStartedMsg)
+	if done {
+		return warm
+	}
+	return tea.Batch(readStream(msg.streamStartedMsg), warm)
 }
 
 func snapshotPresent(s domain.Snapshot) bool {
@@ -245,6 +249,8 @@ func (m *Model) publishStreamInventory(s *viewState) {
 		m.inventories[key] = cached
 	}
 	cached.snapshot = domain.CloneSnapshot(s.snapshot)
+	cached.attempted = true
+	cached.needsReload = false
 	cached.loaded = s.loaded
 	cached.loading = s.loading
 	cached.stale = s.stale

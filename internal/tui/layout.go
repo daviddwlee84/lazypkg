@@ -150,7 +150,7 @@ func (m *Model) layout() screenLayout {
 					_, marked := m.states[m.view].marks[rows[i].key]
 					eligible, _ := m.upgradeEligibility(m.view, *rows[i].pkg)
 					if marked || eligible {
-						add("mark", rows[i].key, rectangle{l.items.x + 3, y, 3, 1})
+						add("mark", rows[i].key, rectangle{l.items.x + 3, y, 2, 1})
 					}
 				}
 				add("row", rows[i].key, rectangle{l.items.x + 1, y, l.items.w - 2, 1})
@@ -213,7 +213,7 @@ func (m *Model) footerButtons() ([]uiButton, []uiButton) {
 	}
 	extra := []uiButton{}
 	if packageView(m.view) && !m.managerFocus {
-		extra = append(extra, uiButton{" ", "Space mark"}, uiButton{"ctrl+a", "^A all"}, uiButton{"U", "U filtered"})
+		extra = append(extra, uiButton{" ", "Space select"}, uiButton{"ctrl+a", "^A all"}, uiButton{"U", "U filtered"})
 	}
 	if m.view == managersView {
 		extra = append(extra, uiButton{"U", "U maintain"}, uiButton{"p", "p prompt"})
@@ -235,7 +235,7 @@ func (m *Model) modalButtons() []uiButton {
 		}
 		return buttons
 	case batchResultModal:
-		buttons := []uiButton{{"esc", "Stop / back"}}
+		buttons := []uiButton{{"esc", "Back"}}
 		if len(m.batch.result.Remaining) > 0 {
 			buttons = append(buttons, uiButton{"r", "r recheck remaining"}, uiButton{"s", "s skip paused"})
 		}
@@ -398,6 +398,7 @@ func (m *Model) activateHit(target hitTarget) tea.Cmd {
 		m.managerFocus = false
 		m.toggleMark(target.value)
 	case "row":
+		m.status = ""
 		m.managerFocus = false
 		m.detailOffset = 0
 		for i, r := range m.rows(m.view) {

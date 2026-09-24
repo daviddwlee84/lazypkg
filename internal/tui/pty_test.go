@@ -77,7 +77,7 @@ func (f *ptyService) StreamQuery(ctx context.Context, request domain.PackageQuer
 		if err != nil {
 			return
 		}
-		coverage := domain.Coverage{Manager: "brew", State: "complete", ObservedAt: time.Now(), Enrichment: "pending"}
+		coverage := domain.Coverage{Manager: "brew", State: "complete", ObservedAt: time.Now().Add(-2 * time.Hour), Enrichment: "pending"}
 		snapshot.Coverage = []domain.Coverage{coverage}
 		emit := func(event domain.QueryEvent) bool {
 			select {

@@ -7,6 +7,43 @@ The implementation retains mpm 8.0.1 and was checked with the active mise Go
 mise's GOROOT; checks therefore used the inherited, consistent environment.
 No shell configuration or toolchain installation was changed to run tests.
 
+### Homebrew identity and session observations
+
+Read-only native reconciliation verified all 354 installed formulae and 44 of
+45 casks. Superset 0.0.56 records `superset-sh/superset` in its installed receipt
+but `homebrew/cask` in current metadata; that source conflict remains explicit.
+Its known distinct native slot does not prevent proving another cask's identity,
+while global coverage continues to report the unresolved record.
+
+A real CLI batch dry-run prepared all six targets from the reported screen:
+
+| Package | Installed | Candidate |
+|---|---|---|
+| homebrew/cask/alacritty | 0.16.1 | 0.17.0 |
+| daviddwlee84/tap/dev-cli | 0.3.0 | 0.3.2 |
+| daviddwlee84/tap/lazychezmoi | 0.1.2 | 0.2.0 |
+| daviddwlee84/tap/lazyclash | 0.1.12 | 0.2.0 |
+| daviddwlee84/tap/lazymlflow | 0.2.1 | 0.3.1 |
+| daviddwlee84/tap/lazypueue | 0.1.2 | 0.2.0 |
+
+The six-item preview took 44.53 seconds in this local sample, including individual
+native previews and fresh checks. No upgrade commands ran. A separate single-item
+dry-run accepted `dev-cli` and retained its complete tap target. Fixtures verify
+that core mutations also use explicit `homebrew/core`/`homebrew/cask` selectors,
+source drift prevents a write, and exit-zero-but-still-outdated remains unverified.
+
+Session tests advance observation age by hours without triggering extra reads or
+disabling selection. They cover memory-before-disk, failure retention, explicit
+refresh, context/mutation invalidation, cached base events, one-time Updates
+preloading, source-safe Discover joins and unknown identity. PTY verification
+covers compact blank/`✓`/`!` markers, old observations, hidden selection, reopening
+a paused batch with `v` across tabs, cancelled drafts, mouse, resize and terminal
+restoration. All mutations in that PTY remain the six isolated fake operations.
+
+The full race suite, vet, native build and Linux/Windows amd64 cross-builds passed.
+
+### Other unreleased workflows
+
 GitHub extension checks used native gh 2.101.0 and a private lazypkg query cache.
 `list --manager gh-ext --json` returned all three registered extensions with
 complete coverage: `dlvhdr/gh-dash` v4.26.0 (binary), `meiji163/gh-notify`

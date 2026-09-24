@@ -60,6 +60,31 @@ func TestBatchCLIEmptyFilterIsNoOp(t *testing.T) {
 	}
 }
 
+func TestBatchCLIUsesUniqueVerifiedTapAliases(t *testing.T) {
+	f := &fakeService{packageRows: []domain.Package{{Manager: "brew", ID: "owner/tap/dev-cli", Version: "0.3.0", Identity: &domain.PackageIdentity{State: "verified", CanonicalID: "owner/tap/dev-cli", Aliases: []string{"dev-cli", "owner/tap/dev-cli"}}}}}
+	_, _, err := invoke(f, "upgrade-batch", "--target", "brew:dev-cli", "--dry-run", "--json")
+	if err != nil || len(f.batchRequest.Targets) != 1 || f.batchRequest.Targets[0].ID != "owner/tap/dev-cli" {
+		t.Fatal(f.batchRequest, err)
+	}
+	f.packageRows = append(f.packageRows, domain.Package{Manager: "brew", ID: "other/tap/dev-cli", Version: "1", Identity: &domain.PackageIdentity{State: "verified", CanonicalID: "other/tap/dev-cli", Aliases: []string{"dev-cli", "other/tap/dev-cli"}}})
+	_, _, err = invoke(f, "upgrade-batch", "--target", "brew:dev-cli", "--dry-run")
+	if err == nil || !strings.Contains(err.Error(), "more than one installation source") || f.batchExecutions != 0 {
+		t.Fatal(err, f.batchExecutions)
+	}
+}
+
+func TestBatchHumanCurrentAndExcludedPreserveSelectedVersions(t *testing.T) {
+	var output strings.Builder
+	ShowBatchPlan(&output, domain.BatchUpgradePlan{Entries: []domain.BatchUpgradeEntry{
+		{Package: domain.Package{Manager: "brew", ID: "tool", Version: "1"}, State: "current"},
+		{Package: domain.Package{Manager: "brew", ID: "missing", Version: "3", Latest: "4"}, State: "excluded", Reason: "Identity is unavailable"},
+	}})
+	text := output.String()
+	if !strings.Contains(text, "Installed: 1 · no available upgrade") || !strings.Contains(text, "Selected version: 3") || !strings.Contains(text, "Observed candidate: 4") || strings.Contains(text, "→") {
+		t.Fatal(text)
+	}
+}
+
 func TestBatchNativeInputNeverPromptsInJSONMode(t *testing.T) {
 	input := strings.NewReader("native answer\n")
 	for _, test := range []struct{ json, terminal, wantInput bool }{{false, true, true}, {true, true, false}, {false, false, false}, {true, false, false}} {

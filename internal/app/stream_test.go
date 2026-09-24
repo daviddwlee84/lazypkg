@@ -25,6 +25,8 @@ type streamingRunner struct {
 	queries        int
 	managerQueries int
 	empty          bool
+	fail           bool
+	failManagers   bool
 }
 
 func (r *streamingRunner) Output(ctx context.Context, c domain.Command) (process.Result, error) {
@@ -35,17 +37,25 @@ func (r *streamingRunner) Output(ctx context.Context, c domain.Command) (process
 	if strings.Contains(args, "managers") {
 		r.mu.Lock()
 		r.managerQueries++
+		fail := r.failManagers
 		r.mu.Unlock()
+		if fail {
+			return process.Result{}, fmt.Errorf("manager detection temporarily unavailable")
+		}
 		return process.Result{Stdout: `{"go":{"id":"go","available":true,"supported":true,"fresh":true,"executable":true,"cli_path":"go","version":"1.27.0"},"gem":{"id":"gem","available":true,"supported":true,"fresh":true,"executable":true,"cli_path":"gem","version":"3.6.9"}}`}, nil
 	}
 	if strings.Contains(args, "installed") || strings.Contains(args, "outdated") {
 		r.mu.Lock()
 		r.queries++
 		empty := r.empty
+		fail := r.fail
 		r.mu.Unlock()
 		manager := "go"
 		if strings.Contains(args, "--gem") {
 			manager = "gem"
+		}
+		if fail {
+			return process.Result{Stdout: fmt.Sprintf(`{%q:{"packages":[],"errors":["native inventory temporarily unavailable"]}}`, manager)}, nil
 		}
 		if manager == "gem" && r.block != nil {
 			if r.started != nil {
@@ -121,7 +131,7 @@ func TestDiskSeedsStaleThenSuccessfulEmptyReplacesThem(t *testing.T) {
 	if done.Err != nil || len(done.Snapshot.Packages) != 0 || done.Snapshot.Coverage[0].Stale {
 		t.Fatal(done)
 	}
-	files, _ := filepath.Glob(filepath.Join(cache, "queries-v1", "*.json"))
+	files, _ := filepath.Glob(filepath.Join(cache, "queries-v2", "*.json"))
 	if len(files) != 1 {
 		t.Fatal(files)
 	}
@@ -138,7 +148,7 @@ func TestDiskSeedsStaleThenSuccessfulEmptyReplacesThem(t *testing.T) {
 		t.Fatal("Updates memory cache missed", r.queries)
 	}
 	next.invalidateInventory()
-	files, _ = filepath.Glob(filepath.Join(cache, "queries-v1", "*.json"))
+	files, _ = filepath.Glob(filepath.Join(cache, "queries-v2", "*.json"))
 	if len(files) != 0 {
 		t.Fatal("mutation retained disk seeds", files)
 	}

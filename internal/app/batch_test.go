@@ -243,6 +243,30 @@ func TestBatchRejectsStaleInputCoverageAndHonorsWriteLock(t *testing.T) {
 	}
 }
 
+func TestBatchRechecksOldAndIncompleteSelectionObservations(t *testing.T) {
+	for _, unknownVersion := range []bool{false, true} {
+		a, r, req := batchApp(t)
+		req.Targets = req.Targets[:1]
+		req.Targets[0].InventoryStale = true
+		req.Targets[0].InventoryAt = time.Now().Add(-6 * time.Hour)
+		if unknownVersion {
+			req.Targets[0].Version = ""
+		}
+		plan, err := a.PlanBatchUpgrade(context.Background(), req)
+		if err != nil || len(plan.Entries) != 1 || plan.Entries[0].State != "planned" || plan.Entries[0].Package.Version != "1.0" || len(r.runs) != 0 {
+			t.Fatal("fresh observation did not replace selection readiness", plan, err, r.runs)
+		}
+		if !plan.Request.Targets[0].InventoryStale {
+			t.Fatal("selection history was fabricated as fresh")
+		}
+		r.failedInventory = true
+		result, err := a.ExecuteBatchUpgrade(context.Background(), plan, nil, io.Discard, io.Discard)
+		if err == nil || !result.Paused || len(r.runs) != 0 {
+			t.Fatal("old selection authorized a write after failed live verification", result, err, r.runs)
+		}
+	}
+}
+
 func TestBatchEligibilitySharedRulesAndStatuses(t *testing.T) {
 	p := domain.Package{Manager: "mise", ID: "node", Version: "22", Latest: "24", Scope: "user runtime"}
 	m := domain.Manager{ID: "mise", Available: true, Scope: "global", Capabilities: []string{"upgrade"}}

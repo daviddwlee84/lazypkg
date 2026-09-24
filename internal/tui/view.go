@@ -241,11 +241,11 @@ func (m *Model) packagePane(width, height int) string {
 				marker = "> "
 			}
 			if packageView(m.view) && r.pkg != nil {
-				check := "[-] "
+				check := "  "
 				if _, marked := s.marks[r.key]; marked {
-					check = "[x] "
-				} else if ok, _ := m.upgradeEligibility(m.view, *r.pkg); ok {
-					check = "[ ] "
+					check = "✓ "
+				} else if ok, _ := m.upgradeEligibility(m.view, *r.pkg); !ok {
+					check = "! "
 				}
 				marker += check
 			}
@@ -327,6 +327,11 @@ func (m *Model) statusLine() string {
 	if m.status != "" {
 		return " " + clean(m.status)
 	}
+	if r, ok := m.selectedRow(); ok && r.pkg != nil && packageView(m.view) {
+		if ok, reason := m.upgradeEligibility(m.view, *r.pkg); !ok {
+			return muted.Render(" ! " + reason)
+		}
+	}
 	s := &m.states[m.view]
 	failed, excluded := m.queryCoverageCounts()
 	if failed > 0 {
@@ -363,7 +368,7 @@ func (m *Model) rowDetails(r row) string {
 			lines = append(lines, "Inventory observed: "+observed(p.InventoryAt))
 		}
 		if p.InventoryStale {
-			lines = append(lines, "", "STALE: cached observation; waiting for provider validation before package actions.")
+			lines = append(lines, "", "Previous observation; native state will be rechecked before changes.")
 		}
 		if progress, ok := m.states[m.view].providers[p.Manager]; ok && progress.enrichment == "pending" {
 			lines = append(lines, "Ownership details are still being collected; base inventory is ready.")
@@ -384,6 +389,20 @@ func (m *Model) rowDetails(r row) string {
 				if extension.Pinned {
 					lines = append(lines, "Pinned: no automatic upgrade")
 				}
+			}
+		}
+		if p.Identity != nil {
+			lines = append(lines, "Package identity: "+p.Identity.State)
+			if p.Identity.CanonicalID != "" {
+				lines = append(lines, "Canonical ID: "+p.Identity.CanonicalID)
+			}
+			if p.Identity.Reason != "" {
+				lines = append(lines, p.Identity.Reason)
+			}
+		}
+		if packageView(m.view) {
+			if ok, reason := m.upgradeEligibility(m.view, *p); !ok {
+				lines = append(lines, "", "Upgrade unavailable: "+reason)
 			}
 		}
 		if p.Description != "" {

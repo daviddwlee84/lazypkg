@@ -34,9 +34,11 @@ Windows and Linux. It uses mpm 8.0.1 subprocess JSON as its main package backend
   checking current/global Node compatibility, preserving bundled npm and Node.
 - `domain.PackageQuery` carries shared manager/group/set scope. Saved sets preserve
   order; Discover joins by manager instance and package ID, never by latest version.
-- Inventory caches expire at 60 seconds and manager health at 24 hours. Failed
-  reads retain explicitly stale observations. Mutation invalidates generations
-  so late reads cannot repopulate caches.
+- Default service inventory caching expires at 60 seconds; TUI `CacheSession`
+  retains observations until explicit refresh/context change/mutation. Manager
+  health expires at 24 hours. Failed reads retain their failure evidence; tab
+  navigation does not retry them. Mutation invalidates generations so late reads
+  cannot repopulate caches. Updates warms once after the first Installed base.
 - `StreamQuery` publishes whole-provider cache/base/enriched batches and a final
   aggregate. `Query` collects that stream. Disk snapshots up to 24 hours old are
   always unverified seeds; context/instance changes invalidate their identity.
@@ -58,6 +60,16 @@ Windows and Linux. It uses mpm 8.0.1 subprocess JSON as its main package backend
   sequential single-package operations. Never use upgrade_all. Revalidate each
   target; failure, drift or uncertain verification pauses remaining work. Resume
   requires a fresh overview and approval. mise versions coalesce without activation.
+- Selection expresses intent and has no age deadline. Known upgrade restrictions
+  render `!`, marks render `✓`, and ordinary rows leave the marker blank. Unknown
+  metadata is checked during planning. Keep marker/hint/mouse eligibility shared;
+  removal has separate restrictions. Preserve executed batch results across drafts.
+- Homebrew package IDs are canonicalized before base publication and joins using
+  native metadata and receipts. Installed aliases never establish catalog identity.
+  Never match taps by basename. Plans retain logical canonical IDs and bind the
+  fully qualified native selector in `ProviderTarget`, including core targets.
+  Item-bound identity issues cannot authorize that item; only proven distinct
+  native slots can be excluded from a selected target's completeness check.
 - `gh-ext` is a hosted adapter for `gh extension`, displayed as `gh ext`.
   Inventory roots, host/config environment and launcher bind the manager instance.
   Native updates require detected per-item `--dry-run` support. Repo/host/root,

@@ -116,6 +116,7 @@ func (a *App) invalidateInventory() {
 	a.cacheEpoch++
 	a.inventory = nil
 	a.updateCache = nil
+	a.sessionCache = nil
 	a.managerCache = nil
 	a.managerCacheContext = ""
 	a.managerCacheAt = time.Time{}
@@ -124,23 +125,7 @@ func (a *App) invalidateInventory() {
 	a.clearQueryDisk()
 }
 func (a *App) cached(m domain.Manager, freshOnly bool) (domain.Snapshot, bool) {
-	a.cacheMu.Lock()
-	defer a.cacheMu.Unlock()
-	s, ok := a.inventory[inventoryKey(m)]
-	if !ok {
-		return domain.Snapshot{}, false
-	}
-	s = domain.CloneSnapshot(s)
-	fresh := len(s.Coverage) == 1 && s.Coverage[0].State == "complete" && !s.Coverage[0].Stale && time.Since(s.Coverage[0].ObservedAt) < inventoryTTL
-	if freshOnly && !fresh {
-		return domain.Snapshot{}, false
-	}
-	if !fresh {
-		for i := range s.Coverage {
-			s.Coverage[i].Stale = true
-		}
-	}
-	return s, true
+	return a.cachedQuery(m, "installed", freshOnly)
 }
 func mergeSnapshot(into *domain.Snapshot, s domain.Snapshot) {
 	into.Packages = append(into.Packages, s.Packages...)
@@ -167,6 +152,11 @@ func (a *App) packages(ctx context.Context, kind, query, manager string, enrich 
 }
 
 func (a *App) searchQuery(ctx context.Context, q domain.PackageQuery) (domain.Snapshot, error) {
+	if q.CachePolicy != "" && q.CachePolicy != domain.CacheSession {
+		return domain.Snapshot{}, fmt.Errorf("unknown cache policy %q", q.CachePolicy)
+	}
+	contextKey := a.queryContext()
+	a.prepareQueryContext(contextKey)
 	if q.Refresh {
 		a.invalidateDetection()
 	}
@@ -194,7 +184,15 @@ func (a *App) searchQuery(ctx context.Context, q domain.PackageQuery) (domain.Sn
 		}
 		for _, id := range ids {
 			m, ok := lookup[id]
-			if ok {
+			if ok && !q.Refresh {
+				if record, found := a.memorySeed(contextKey, "installed", id); found {
+					cached := record.Snapshot
+					if q.CachePolicy != domain.CacheSession && !freshBatch(cached) {
+						cached = staleSnapshot(cached)
+					}
+					mergeSnapshot(&inventory, cached)
+					continue
+				}
 				if cached, found := a.cached(m, false); found {
 					mergeSnapshot(&inventory, cached)
 					continue
@@ -203,7 +201,7 @@ func (a *App) searchQuery(ctx context.Context, q domain.PackageQuery) (domain.Sn
 			inventory.Coverage = append(inventory.Coverage, domain.Coverage{Manager: id, Instance: instance(m), State: "pending"})
 		}
 	} else {
-		inventory, err = a.Query(ctx, domain.PackageQuery{Kind: "installed", Managers: ids, Refresh: q.Refresh})
+		inventory, err = a.Query(ctx, domain.PackageQuery{Kind: "installed", Managers: ids, Refresh: q.Refresh, CachePolicy: q.CachePolicy})
 		if err != nil {
 			if ctx.Err() != nil {
 				return s, ctx.Err()
@@ -243,9 +241,7 @@ func (a *App) searchQuery(ctx context.Context, q domain.PackageQuery) (domain.Sn
 }
 
 func (a *App) read(ctx context.Context, q domain.PackageQuery, enrich, useCache bool) (domain.Snapshot, error) {
-	a.cacheMu.Lock()
-	epoch := a.cacheEpoch
-	a.cacheMu.Unlock()
+	epoch := a.prepareQueryContext(a.queryContext())
 	s := domain.Snapshot{Packages: []domain.Package{}, ObservedAt: time.Now()}
 	if q.Kind != "installed" && q.Kind != "search" && q.Kind != "outdated" {
 		return s, fmt.Errorf("unknown query %q", q.Kind)
@@ -298,7 +294,13 @@ func (a *App) read(ctx context.Context, q domain.PackageQuery, enrich, useCache 
 			coverage.State = "unsupported"
 			coverage.Message = "does not support " + q.Kind
 		default:
-			if useCache {
+			if useCache && !q.Refresh {
+				if q.CachePolicy == domain.CacheSession {
+					if record, found := a.memorySeed(a.queryContext(), q.Kind, id); found {
+						mergeSnapshot(&s, record.Snapshot)
+						continue
+					}
+				}
 				if cached, ok := a.cached(m, true); ok {
 					mergeSnapshot(&s, cached)
 					continue
@@ -356,6 +358,9 @@ func (a *App) read(ctx context.Context, q domain.PackageQuery, enrich, useCache 
 					query = q.Query
 				}
 				result, e = mpm.Packages(ctx, q.Kind, query, m.ID)
+			}
+			if e == nil {
+				result, e = a.normalizeHomebrew(ctx, m, q.Kind, q.Query, result)
 			}
 			ch <- reply{m, result, e}
 		}(m)

@@ -70,6 +70,24 @@ func (a *App) PlanBatchUpgrade(ctx context.Context, req domain.BatchUpgradeReque
 	if err != nil {
 		return p, err
 	}
+	// A selection with unknown identity is intent, not authority. Resolve it
+	// from this fresh inventory before grouping aliases into a single target.
+	groups = map[string][]domain.Package{}
+	order = nil
+	for i, selected := range p.Request.Targets {
+		if (selected.Manager == "brew" || selected.Manager == "cask") && (selected.Identity == nil || selected.Identity.State != "verified") {
+			if rows := batchRows(data.installed, selected); len(rows) > 0 && freshPackageInventory(data.installed, rows[0]) {
+				selected.ID = rows[0].ID
+				selected.Identity = batchPackage(rows[0]).Identity
+				p.Request.Targets[i] = selected
+			}
+		}
+		key := domain.BatchUpgradeTargetKey(selected)
+		if _, ok := groups[key]; !ok {
+			order = append(order, key)
+		}
+		groups[key] = append(groups[key], selected)
+	}
 	eligibilityAt := time.Now()
 	for _, key := range order {
 		if err := ctx.Err(); err != nil {
@@ -93,19 +111,19 @@ func (a *App) PlanBatchUpgrade(ctx context.Context, req domain.BatchUpgradeReque
 			p.Entries = append(p.Entries, entry)
 			continue
 		}
-		if ok, reason := domain.BatchUpgradeEligibilityAt(selected, m, data.installed.Coverage, eligibilityAt); !ok {
+		if reason := domain.BatchUpgradeBlocker(selected, m); reason != "" {
 			entry.Reason = reason
-			p.Entries = append(p.Entries, entry)
-			continue
-		}
-		if !freshInventory(data.installed, m.ID) {
-			entry.Reason = "Fresh complete installed inventory is required"
 			p.Entries = append(p.Entries, entry)
 			continue
 		}
 		rows := batchRows(data.installed, selected)
 		if len(rows) == 0 {
-			entry.Reason = "The selected installation is no longer present in fresh inventory"
+			entry.Reason = "The selected installation could not be uniquely matched in fresh inventory; inspect its source and refresh"
+			p.Entries = append(p.Entries, entry)
+			continue
+		}
+		if !freshPackageInventory(data.installed, rows[0], eligibilityAt) {
+			entry.Reason = "Fresh verified installed inventory is required for this package"
 			p.Entries = append(p.Entries, entry)
 			continue
 		}
@@ -117,7 +135,7 @@ func (a *App) PlanBatchUpgrade(ctx context.Context, req domain.BatchUpgradeReque
 		entry.Package = batchPackage(rows[0])
 		entry.ObservedVersions = batchVersions(rows)
 		entry.Context = batchContext(m, rows)
-		update, hasUpdate := batchUpdate(data.outdated, selected)
+		update, hasUpdate := batchUpdate(data.outdated, entry.Package)
 		if hasUpdate {
 			entry.Package.Latest = update.Latest
 			entry.Package.LatestInstalled = update.LatestInstalled
@@ -125,12 +143,7 @@ func (a *App) PlanBatchUpgrade(ctx context.Context, req domain.BatchUpgradeReque
 				entry.Package.Extension = batchPackage(update).Extension
 			}
 		}
-		if !freshInventory(data.installed, m.ID) {
-			entry.Reason = "Fresh complete installed inventory is required"
-			p.Entries = append(p.Entries, entry)
-			continue
-		}
-		eligible, reason := domain.BatchUpgradeEligibilityAt(entry.Package, m, data.installed.Coverage, eligibilityAt)
+		eligible, reason := domain.BatchUpgradeEligibilityAt(entry.Package, m, verifiedPackageCoverage(data.installed, entry.Package, eligibilityAt), eligibilityAt)
 		// A completed native update check may establish a safe no-op for an
 		// otherwise manageable extension. Pinned/local/dirty records stay excluded.
 		ghCurrent := reason == "The extension has no verified available update" && m.ID == "gh-ext" && entry.Package.Extension != nil && entry.Package.Extension.BlockedReason == "" && !entry.Package.Extension.Pinned && (entry.Package.Extension.Kind == "git" || entry.Package.Extension.Kind == "binary") && (entry.Package.Extension.Status == "current" || entry.Package.Extension.Status == "not-checked") && m.Supports("outdated") && freshInventory(data.outdated, m.ID) && !hasUpdate
@@ -140,7 +153,7 @@ func (a *App) PlanBatchUpgrade(ctx context.Context, req domain.BatchUpgradeReque
 			continue
 		}
 		if m.Supports("outdated") {
-			if !freshInventory(data.outdated, m.ID) {
+			if !freshPackageInventory(data.outdated, entry.Package, eligibilityAt) {
 				entry.Reason = "Fresh complete update status is required"
 				p.Entries = append(p.Entries, entry)
 				continue
@@ -156,7 +169,7 @@ func (a *App) PlanBatchUpgrade(ctx context.Context, req domain.BatchUpgradeReque
 		for _, target := range groups[key] {
 			found := false
 			for _, row := range rows {
-				if row.Version == target.Version && (target.Root == "" || batchCanonical(row.Root) == batchCanonical(target.Root)) {
+				if (target.Version == "" || row.Version == target.Version) && (target.Root == "" || batchCanonical(row.Root) == batchCanonical(target.Root)) {
 					found = true
 					break
 				}
@@ -171,7 +184,7 @@ func (a *App) PlanBatchUpgrade(ctx context.Context, req domain.BatchUpgradeReque
 			continue
 		}
 		entry.TargetVersion = entry.Package.Latest
-		action := domain.ActionRequest{Operation: "upgrade", Manager: m.ID, Package: selected.ID}
+		action := domain.ActionRequest{Operation: "upgrade", Manager: m.ID, Package: entry.Package.ID}
 		if m.ID == "mise" {
 			if entry.TargetVersion == "" {
 				entry.Reason = "An exact new runtime version could not be determined"
@@ -192,7 +205,7 @@ func (a *App) PlanBatchUpgrade(ctx context.Context, req domain.BatchUpgradeReque
 			p.Entries = append(p.Entries, entry)
 			continue
 		}
-		if single.Request.Operation != "upgrade" || single.Request.Manager != m.ID || !sameID(m.ID, single.Request.Package, selected.ID) {
+		if single.Request.Operation != "upgrade" || single.Request.Manager != m.ID || !sameID(m.ID, single.Request.Package, entry.Package.ID) {
 			entry.Reason = "Native plan did not preserve the selected singular upgrade"
 			p.Entries = append(p.Entries, entry)
 			continue
@@ -233,13 +246,16 @@ func (a *App) batchRead(ctx context.Context, ids []string, managers []domain.Man
 	// ownership work is restricted to the selected package IDs.
 	selected := []domain.Package{}
 	indices := []int{}
+	wanted := map[string]bool{}
+	for _, target := range targets {
+		for _, row := range batchRows(d.installed, target) {
+			wanted[row.Key()] = true
+		}
+	}
 	for index, row := range d.installed.Packages {
-		for _, target := range targets {
-			if row.Manager == target.Manager && sameID(row.Manager, row.ID, target.ID) {
-				selected = append(selected, row)
-				indices = append(indices, index)
-				break
-			}
+		if wanted[row.Key()] {
+			selected = append(selected, row)
+			indices = append(indices, index)
 		}
 	}
 	if len(selected) > 0 {
@@ -271,6 +287,11 @@ func (a *App) batchRead(ctx context.Context, ids []string, managers []domain.Man
 // cache/UI fields change on every fresh query and must not invalidate approval.
 func batchPackage(p domain.Package) domain.Package {
 	out := domain.Package{Manager: p.Manager, ID: p.ID, Name: p.Name, Version: p.Version, Latest: p.Latest, LatestInstalled: p.LatestInstalled, Scope: p.Scope, Root: p.Root, Instance: p.Instance, Active: p.Active, Global: p.Global, ConfigSource: p.ConfigSource, InventoryStale: p.InventoryStale, Candidate: p.Candidate}
+	if p.Identity != nil {
+		identity := *p.Identity
+		identity.Aliases = append([]string(nil), p.Identity.Aliases...)
+		out.Identity = &identity
+	}
 	if p.Extension != nil {
 		data, _ := json.Marshal(p.Extension)
 		_ = json.Unmarshal(data, &out.Extension)
@@ -279,8 +300,17 @@ func batchPackage(p domain.Package) domain.Package {
 }
 func batchRows(s domain.Snapshot, p domain.Package) []domain.Package {
 	rows := []domain.Package{}
+	if (p.Manager == "brew" || p.Manager == "cask") && (p.Identity == nil || p.Identity.State != "verified") {
+		matched, err := domain.SelectPackageRecords(s.Packages, p.Manager, p.ID, p.Instance)
+		if err != nil {
+			return rows
+		}
+		rows = matched
+		sort.Slice(rows, func(i, j int) bool { return rows[i].Key() < rows[j].Key() })
+		return rows
+	}
 	for _, row := range s.Packages {
-		if row.Manager == p.Manager && sameID(p.Manager, row.ID, p.ID) && (p.Instance == "" || row.Instance == p.Instance) {
+		if domain.SamePackageIdentity(row, p) && (p.Instance == "" || row.Instance == p.Instance) {
 			rows = append(rows, row)
 		}
 	}
@@ -452,7 +482,7 @@ func (a *App) ExecuteBatchUpgrade(ctx context.Context, p domain.BatchUpgradePlan
 		if err != nil {
 			return pause(index, "unverified", err)
 		}
-		if !freshInventory(data.installed, m.ID) {
+		if !freshPackageInventory(data.installed, entry.Package) {
 			return pause(index, "unverified", fmt.Errorf("fresh installed inventory could not be verified for %s", entry.Package.Manager))
 		}
 		rows := batchRows(data.installed, entry.Package)
@@ -460,7 +490,7 @@ func (a *App) ExecuteBatchUpgrade(ctx context.Context, p domain.BatchUpgradePlan
 			return pause(index, "drift", fmt.Errorf("the selected manager instance or installation context changed for %s", entry.Package.ID))
 		}
 		update, available := batchUpdate(data.outdated, entry.Package)
-		if m.Supports("outdated") && !freshInventory(data.outdated, m.ID) {
+		if m.Supports("outdated") && !freshPackageInventory(data.outdated, entry.Package) {
 			return pause(index, "unverified", fmt.Errorf("fresh update status could not be verified for %s", m.ID))
 		}
 		if m.ID == "gh-ext" {
@@ -488,7 +518,7 @@ func (a *App) ExecuteBatchUpgrade(ctx context.Context, p domain.BatchUpgradePlan
 				live.Extension = update.Extension
 			}
 		}
-		if ok, reason := domain.BatchUpgradeEligibility(live, m, data.installed.Coverage); !ok {
+		if ok, reason := domain.BatchUpgradeEligibility(live, m, verifiedPackageCoverage(data.installed, live)); !ok {
 			return pause(index, "drift", fmt.Errorf("%s: %s", entry.Package.ID, reason))
 		}
 		single, err := a.Plan(ctx, entry.Plan.Request)

@@ -52,6 +52,8 @@ type App struct {
 	maintenance         *maintenance.Engine
 	maintenanceEnv      map[string]string
 	ghProviders         map[string]*backend.GHExtensions
+	homebrewJobs        sharedWork[*backend.HomebrewIndex]
+	sessionCache        map[string]sessionRecord
 }
 
 func New(c config.Config) *App {
@@ -164,6 +166,26 @@ func (a *App) Plan(ctx context.Context, req domain.ActionRequest) (domain.Action
 	if !selected.Supports(req.Operation) {
 		return p, fmt.Errorf("%s does not support %s", req.Manager, req.Operation)
 	}
+	if req.Manager == "brew" || req.Manager == "cask" {
+		var identity *domain.PackageIdentity
+		req, identity, err = a.resolveBrewAction(ctx, req, *selected)
+		if err != nil {
+			return p, err
+		}
+		if err := Validate(req); err != nil {
+			return p, err
+		}
+		if domain.ProtectedBackendPackage(domain.Package{Manager: req.Manager, ID: req.Package, Identity: identity}) && (req.Operation == "upgrade" || req.Operation == "remove") {
+			return p, fmt.Errorf("mpm is the active backend; change its version through setup, or switch backend before removing it")
+		}
+		p.Request = req
+		p.ProviderIdentity = identity
+		p.ProviderInstance = instance(*selected)
+		p.Title = req.Operation + " " + req.Manager + " / " + req.Package
+		p.ProviderTarget = identity.Tap + "/" + identity.Name
+		p.ProviderContext = digestJSON([]string{"homebrew-action-v1", a.queryContext(), batchContext(*selected, nil), req.Package, identity.Tap, identity.Kind})
+		p.Warnings = append(p.Warnings, "Verified Homebrew target: "+p.ProviderTarget+" ("+identity.Kind+").")
+	}
 	if req.Manager == "gh-ext" {
 		if req.Version != "" {
 			return p, fmt.Errorf("gh extension operations do not accept --version; pinning is a separate gh operation")
@@ -205,11 +227,11 @@ func (a *App) Plan(ctx context.Context, req domain.ActionRequest) (domain.Action
 		if !included {
 			active = append(active, req.Manager)
 		}
-		inventory, e := a.read(ctx, domain.PackageQuery{Kind: "installed", Query: req.Package, Managers: active, Refresh: true}, false, false)
+		inventory, e := a.read(ctx, domain.PackageQuery{Kind: "installed", Managers: active, Refresh: true}, false, false)
 		if e != nil {
 			p.Warnings = append(p.Warnings, "Existing installations could not be checked: "+e.Error())
 		}
-		if !freshInventory(inventory, req.Manager) {
+		if !freshPackageInventory(inventory, domain.Package{Manager: req.Manager, ID: req.Package, Instance: instance(*selected), Identity: p.ProviderIdentity}) {
 			return p, fmt.Errorf("cannot verify fresh %s inventory; refresh or repair that provider before installation", req.Manager)
 		}
 		for _, item := range inventory.Packages {
@@ -230,7 +252,7 @@ func (a *App) Plan(ctx context.Context, req domain.ActionRequest) (domain.Action
 		if e != nil {
 			return p, e
 		}
-		if !freshInventory(s, req.Manager) {
+		if !freshPackageInventory(s, domain.Package{Manager: req.Manager, ID: req.Package, Instance: instance(*selected), Identity: p.ProviderIdentity}) {
 			return p, fmt.Errorf("cannot verify fresh %s inventory; retained or partial rows cannot authorize %s", req.Manager, req.Operation)
 		}
 		if len(s.Issues) > 0 {
@@ -305,11 +327,15 @@ func (a *App) Plan(ctx context.Context, req domain.ActionRequest) (domain.Action
 	if e != nil {
 		return p, e
 	}
-	p.Preview, e = mpm.Preview(ctx, req)
+	nativeRequest := req
+	if p.ProviderTarget != "" {
+		nativeRequest.Package = p.ProviderTarget
+	}
+	p.Preview, e = mpm.Preview(ctx, nativeRequest)
 	if e != nil {
 		return p, e
 	}
-	p.Steps = []domain.Step{{ID: "package", Description: p.Title, Command: domain.Command{Path: mpm.Path, Args: []string{"--" + req.Manager, req.Operation, "--", backend.Specifier(req.Manager, req.Package)}}}}
+	p.Steps = []domain.Step{{ID: "package", Description: p.Title, Command: domain.Command{Path: mpm.Path, Args: []string{"--" + req.Manager, req.Operation, "--", backend.Specifier(req.Manager, nativeRequest.Package)}}}}
 	if req.Operation == "remove" {
 		p.Warnings = append(p.Warnings, "The selected manager may remove dependent files or run its uninstall scripts; review its native prompts.")
 	}
@@ -395,9 +421,10 @@ func (a *App) execute(ctx context.Context, p domain.ActionPlan, in io.Reader, ou
 	if err != nil {
 		return domain.ActionResult{}, err
 	}
-	if fresh.ProviderContext != p.ProviderContext || fresh.Preview != p.Preview || !reflect.DeepEqual(fresh.Request, p.Request) || !reflect.DeepEqual(fresh.Warnings, p.Warnings) {
+	if fresh.ProviderInstance != p.ProviderInstance || fresh.ProviderTarget != p.ProviderTarget || fresh.ProviderContext != p.ProviderContext || fresh.Preview != p.Preview || !reflect.DeepEqual(fresh.Request, p.Request) || !reflect.DeepEqual(fresh.Warnings, p.Warnings) {
 		return domain.ActionResult{}, fmt.Errorf("operation or its known effects changed; review a new plan")
 	}
+	verifiedTarget := domain.Package{Manager: req.Manager, ID: req.Package, Instance: fresh.ProviderInstance, Identity: fresh.ProviderIdentity}
 	var priorVersion string
 	var supportsOutdated bool
 	if req.Operation == "upgrade" && req.Manager != "mise" {
@@ -440,7 +467,11 @@ func (a *App) execute(ctx context.Context, p domain.ActionPlan, in io.Reader, ou
 		if err = mpm.Check(ctx); err != nil {
 			return domain.ActionResult{}, err
 		}
-		c, done, err = mpm.Mutation(req)
+		nativeRequest := req
+		if fresh.ProviderTarget != "" {
+			nativeRequest.Package = fresh.ProviderTarget
+		}
+		c, done, err = mpm.Mutation(nativeRequest)
 		if err != nil {
 			return domain.ActionResult{}, err
 		}
@@ -454,7 +485,7 @@ func (a *App) execute(ctx context.Context, p domain.ActionPlan, in io.Reader, ou
 		return r, err
 	}
 	s, e := a.packages(ctx, "installed", "", req.Manager, false)
-	if e != nil || len(s.Issues) > 0 {
+	if e != nil || (req.Manager == "brew" || req.Manager == "cask" || len(s.Issues) > 0) && !freshPackageInventory(s, verifiedTarget) {
 		r.Steps[0].Status = "unverified"
 		r.Message = "Command exited successfully, but inventory verification is incomplete. Refresh before repeating the operation."
 		if e == nil {
@@ -497,7 +528,7 @@ func (a *App) execute(ctx context.Context, p domain.ActionPlan, in io.Reader, ou
 			return r, errors.New(r.Message)
 		}
 		updates, e := a.packages(ctx, "outdated", "", req.Manager, false)
-		if e != nil || len(updates.Issues) != 0 {
+		if e != nil || (req.Manager == "brew" || req.Manager == "cask" || len(updates.Issues) > 0) && !freshPackageInventory(updates, verifiedTarget) {
 			r.Steps[0].Status = "unverified"
 			r.Message = "Update command completed; current update status could not be verified."
 			return r, errors.New(r.Message)
@@ -522,14 +553,7 @@ func (a *App) PlanSetup(ctx context.Context, ids []string) (domain.ActionPlan, e
 }
 
 func sameID(manager, a, b string) bool {
-	if manager == "uvx" || manager == "pipx" {
-		norm := regexp.MustCompile(`[._-]+`)
-		return norm.ReplaceAllString(strings.ToLower(a), "-") == norm.ReplaceAllString(strings.ToLower(b), "-")
-	}
-	if manager == "winget" || manager == "scoop" || manager == "choco" {
-		return strings.EqualFold(a, b)
-	}
-	return a == b
+	return domain.NormalizePackageID(manager, a) == domain.NormalizePackageID(manager, b)
 }
 
 func freshInventory(s domain.Snapshot, id string) bool {

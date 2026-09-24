@@ -41,6 +41,8 @@ type viewState struct {
 	cancel           context.CancelFunc
 	loading          bool
 	loaded           bool
+	attempted        bool
+	needsReload      bool
 	stale            bool
 	force            bool
 	streaming        bool
@@ -143,6 +145,10 @@ type Model struct {
 	quitting           bool
 	workflow           workflowState
 	batch              batchState
+	lastBatch          *batchState
+	lastOperation      string
+	warmUpdatesPending bool
+	warmInstalledReady bool
 }
 
 type packagesMsg struct {
@@ -229,6 +235,8 @@ func Run(ctx context.Context, service domain.Service, initialView string, option
 
 func (m *Model) Init() tea.Cmd {
 	commands := []tea.Cmd{m.loadManagers(), m.loadPreferences()}
+	m.warmUpdatesPending = m.workflow.initial == "" && !m.startSetup && m.view != updatesView
+	m.warmInstalledReady = false
 	if strings.HasPrefix(m.workflow.initial, "maintenance") {
 		commands = append(commands, m.openMaintenance(strings.HasSuffix(m.workflow.initial, ":refresh")))
 	} else if strings.HasPrefix(m.workflow.initial, "resolve:") {
@@ -236,8 +244,13 @@ func (m *Model) Init() tea.Cmd {
 	} else if m.startSetup {
 		m.modal = setupModal
 		commands = append(commands, m.loadSetup())
-	} else if m.view != managersView {
-		commands = append(commands, m.loadView(m.view))
+	} else {
+		if m.view != managersView {
+			commands = append(commands, m.loadView(m.view))
+		}
+		if m.warmUpdatesPending && m.view != installedView && m.view != discoverView {
+			commands = append(commands, m.loadView(installedView))
+		}
 	}
 	return tea.Batch(commands...)
 }
@@ -256,6 +269,9 @@ func (m *Model) loadManagers() tea.Cmd {
 }
 
 func (m *Model) loadView(view viewID) tea.Cmd {
+	if view == updatesView {
+		m.warmUpdatesPending = false
+	}
 	if view == managersView {
 		m.healthForcePending = true
 		return m.loadManagers()
@@ -265,6 +281,8 @@ func (m *Model) loadView(view viewID) tea.Cmd {
 		s.cancel()
 	}
 	s.generation++
+	s.attempted = true
+	s.needsReload = false
 	if view == discoverView && strings.TrimSpace(s.query) == "" {
 		s.loading = false
 		return m.ensureInventory(false)
@@ -300,7 +318,7 @@ func (m *Model) loadView(view viewID) tea.Cmd {
 	if view == updatesView {
 		kind = "outdated"
 	}
-	request := domain.PackageQuery{Kind: kind, Query: query, Managers: m.effectiveManagers(), DeferInventory: view == discoverView, Refresh: s.force}
+	request := domain.PackageQuery{Kind: kind, Query: query, Managers: m.effectiveManagers(), DeferInventory: view == discoverView, Refresh: s.force, CachePolicy: domain.CacheSession}
 	s.force = false
 	m.beginViewStream(view)
 	command := m.startStream(ctx, request, streamTarget{view: view, generation: generation, query: query})
@@ -346,7 +364,7 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.acceptPreferences(msg)
 	case inventoryMsg:
 		m.acceptInventory(msg)
-		return m, nil
+		return m, m.installedProgress(domain.QueryEvent{}, true)
 	case healthMsg:
 		m.acceptHealth(msg)
 		return m, nil
@@ -416,6 +434,7 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.reconcile(msg.view, false)
 		if msg.view == installedView {
 			m.cacheInstalled(s)
+			return m, m.installedProgress(domain.QueryEvent{}, true)
 		}
 		return m, nil
 	case diagnosticsMsg:
@@ -466,23 +485,17 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.executing = false
 		m.modal = noModal
 		m.lastResult, m.lastError = msg.result, msg.err
+		m.lastOperation = "single"
 		m.status = "Completed. Press v to view the result."
 		if msg.err != nil {
 			m.status = "Operation failed or stopped; review its result with v."
 		}
-		for i := range m.states {
-			m.cancelView(viewID(i))
-		}
+		m.invalidateViews()
 		m.setup.loaded = false
-		m.invalidateInventories()
 		if cmd, handled := m.afterWorkflowExecution(msg); handled {
 			return m, cmd
 		}
-		commands := []tea.Cmd{m.loadManagers()}
-		if m.view != managersView {
-			commands = append(commands, m.loadView(m.view))
-		}
-		return m, tea.Batch(commands...)
+		return m, m.refreshAfterMutation(m.view)
 	case tea.KeyPressMsg:
 		if m.executing {
 			return m, nil
@@ -715,6 +728,10 @@ func (m *Model) navigationKey(key tea.KeyPressMsg) tea.Cmd {
 		m.modal = issuesModal
 		m.modalOffset = 0
 	case "v":
+		if m.lastOperation == "batch" && m.lastBatch != nil {
+			m.reopenBatch()
+			return nil
+		}
 		m.modal = resultModal
 		m.modalOffset = 0
 	default:
@@ -728,6 +745,7 @@ func (m *Model) navigationKey(key tea.KeyPressMsg) tea.Cmd {
 }
 
 func (m *Model) switchView(index int) tea.Cmd {
+	m.status = ""
 	m.filtering = false
 	m.input.Blur()
 	m.view = viewID(index)
@@ -740,7 +758,7 @@ func (m *Model) switchView(index int) tea.Cmd {
 		return m.checkManagerHealth(false)
 	}
 	s := &m.states[m.view]
-	if !s.loading && (!s.loaded || s.stale) {
+	if !s.loading && ((!s.attempted && !s.loaded) || s.needsReload) {
 		return m.loadView(m.view)
 	}
 	if m.view == discoverView {
@@ -779,6 +797,7 @@ func (m *Model) managerCursorID() string {
 }
 
 func (m *Model) move(delta int) {
+	m.status = ""
 	if m.managerFocus {
 		m.managerCursor = clamp(m.managerCursor+delta, 0, len(m.sidebarManagers()))
 		return
@@ -834,6 +853,14 @@ func (m *Model) ensureVisible(s *viewState) {
 
 func (m *Model) cancelView(view viewID) {
 	s := &m.states[view]
+	if view == installedView && s.loading {
+		if cached := m.inventories[s.scopeKey]; cached != nil && cached.loading {
+			cached.loading = false
+			cached.attempted = true
+			cached.err = context.Canceled
+			cached.stale = cached.loaded
+		}
+	}
 	if s.cancel != nil {
 		s.cancel()
 	}

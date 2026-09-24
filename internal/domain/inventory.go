@@ -26,6 +26,11 @@ func CloneSnapshot(s Snapshot) Snapshot {
 	s.InventoryCoverage = append([]Coverage(nil), s.InventoryCoverage...)
 	for i := range s.Packages {
 		p := &s.Packages[i]
+		if p.Identity != nil {
+			copy := *p.Identity
+			copy.Aliases = append([]string(nil), copy.Aliases...)
+			p.Identity = &copy
+		}
 		if p.Extension != nil {
 			copy := *p.Extension
 			p.Extension = &copy
@@ -81,10 +86,22 @@ func AttachInventory(candidates, inventory Snapshot) Snapshot {
 				p.InstallState = "unavailable"
 			}
 		}
+		if p.Identity != nil && p.Identity.State != "verified" {
+			p.InstallState = "identity_unknown"
+			continue
+		}
 		matched := false
+		identityIncomplete := false
 		versions := map[string]bool{}
 		for _, record := range inventory.Packages {
-			if record.Manager != p.Manager || NormalizePackageID(record.Manager, record.ID) != NormalizePackageID(p.Manager, p.ID) || (p.Instance != "" && record.Instance != "" && p.Instance != record.Instance) {
+			if record.Manager != p.Manager || (p.Instance != "" && record.Instance != "" && p.Instance != record.Instance) {
+				continue
+			}
+			if record.Identity != nil && record.Identity.State != "verified" {
+				identityIncomplete = true
+				continue
+			}
+			if !SamePackageIdentity(record, *p) {
 				continue
 			}
 			matched = true
@@ -109,6 +126,8 @@ func AttachInventory(candidates, inventory Snapshot) Snapshot {
 			if len(p.InstalledVersions) == 1 {
 				p.Version = p.InstalledVersions[0]
 			}
+		} else if identityIncomplete && p.InstallState == "not_installed" {
+			p.InstallState = "check_failed"
 		}
 	}
 	return out

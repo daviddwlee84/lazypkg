@@ -105,7 +105,7 @@ def main() -> None:
                 raise AssertionError("Mouse cell-motion reporting was not enabled")
             click(26, 7)  # Select the second item using actual SGR mouse input.
             click(26, 6)
-            click(24, 6)  # A separate checkbox marks a package without opening details.
+            click(24, 6)  # A blank marker gutter selects an aged observation without opening details.
             click(24, 6)  # Toggle it back off.
             send(b"\x04\x15\x06\x02")  # Vim half/full-page aliases remain navigation.
             alive()
@@ -226,6 +226,16 @@ def main() -> None:
             require("Package upgrade results")
             if json.loads(receipt.read_text())["calls"] != 5:
                 raise AssertionError("Batch continued after its fake failure")
+            send(b"\x1b")  # Leave paused results; browsing does not resume anything.
+            send(b"5")
+            send(b"v")  # Reopen the most recent executed batch from another tab.
+            send(b"\x1b")
+            send(b"1", 0.5)
+            send(b"U", 0.3)  # Prepare a different draft, then cancel it.
+            send(b"\x1b")
+            send(b"v")  # The original paused batch is still recoverable.
+            if json.loads(receipt.read_text())["calls"] != 5:
+                raise AssertionError("Browsing/draft cancellation resumed a paused batch")
             send(b"r", 0.3)  # Recheck remaining target; always another overview.
             send(b"\r")
             if json.loads(receipt.read_text())["calls"] != 5:
@@ -264,7 +274,8 @@ def main() -> None:
                 "streamed base before enrichment, text/paste isolation, manager filter, search, "
                 "review/cancel, explicit approval, native prompt, result acknowledgement, "
                 "per-target resolution, maintenance skip/recheck, exact prompt export, "
-                "hidden multi-selection, aggregate approval, batch pause/recheck, Vim paging, "
+                "aged observations selectable, hidden multi-selection, aggregate approval, "
+                "paused v reopening across tabs/draft cancellation, batch recheck, Vim paging, "
                 "dashboard return, 48x16 resize, clean exit."
             )
             print("Terminal ECHO/ICANON, cursor and alternate screen restored; fake mutations: 6 (3 single jobs, 2 batch attempts, 1 explicitly reviewed retry).")

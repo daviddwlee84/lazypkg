@@ -61,7 +61,7 @@ usable width. Manager filters, selection and queries survive view changes.
 | `/` | Filter locally; in Discover, type and Enter to search |
 | `Enter` | Details / accept filter |
 | `i`, `u`, `x` | Review install, upgrade, removal when supported |
-| `Space`, `Ctrl+a` in Installed/Updates | Mark an eligible row / toggle all eligible filtered rows |
+| `Space`, `Ctrl+a` in Installed/Updates | Select a row / toggle all selectable filtered rows |
 | `u`, `U` in Installed/Updates | Review marked items (otherwise current row) / all filtered rows |
 | `a` | Review global activation of an installed mise version |
 | `d` | Diagnose a selected package's first known command |
@@ -86,14 +86,29 @@ the actual release at execution; a displayed version is not a version pin.
 mise groups versions of the same tool into one exact installation and does not
 activate it or remove older versions.
 
+Unselected rows have an empty marker, selected rows show `✓`, and known upgrade
+restrictions show `!`. Focus the row or press Space to see the reason. The active
+mpm backend is managed through Setup; ordinary upgrade/removal is unavailable.
+Restrictions are specific to an action: a pinned remote gh extension may still
+be removed. Older observations and unknown metadata can be selected for review;
+fresh planning must verify the target before any write is offered. Ctrl+A can
+always clear existing visible selections. `v` reopens the last operation result,
+including a paused batch; cancelling a newer preview preserves that result.
+
 Installed and Updates publish one provider at a time. Basic package records are
 usable before slower providers or ownership enrichment finish; progress and
-provider errors remain visible. Identical in-flight reads are shared. The
-60-second memory cache covers both views, and a private disk cache can seed rows
-observed within the past 24 hours on reopening. Disk rows always start as stale
-and unverified; a background live read replaces them. Refresh with `r` or the
-CLI's `--refresh`. Actions require a fresh provider result and still prepare a
-new validated plan. Disable disk storage with `query_cache = false`.
+provider errors remain visible. Identical in-flight reads are shared. After the
+first Installed base result, Updates loads once in the background. Browsing reuses
+observations throughout the TUI session, including Discover's inventory joins;
+elapsed time alone does not disable selection or start another query. Refresh
+with `r`; switching tabs does not retry failed reads automatically. An operation
+invalidates observations and refreshes the active view and Updates.
+
+A private disk cache can seed rows observed within the past 24 hours on reopening.
+Disk rows start as unverified observations and are replaced by a live read.
+Action planning and execution always query fresh state, independent of the browse
+cache. CLI queries retain their normal cache policy and explicit `--refresh`.
+Disable disk storage with `query_cache = false`.
 
 Mouse support is enabled by default: click tabs, rows, manager filters and
 overlay controls, or scroll with the wheel. Use `--mouse=false` or `mouse = false`
@@ -207,6 +222,13 @@ Groups describe catalog membership; they do not bypass the scope policy.
   8.0.1 parsing artifact that treats entrypoint lines beginning with `v` as
   packages named `-`.
 - **Cargo:** inventory/search/install/remove; no mpm update support.
+- **Homebrew:** native metadata and installation receipts reconcile short
+  inventory names with tap-qualified Updates IDs. Custom taps retain their full
+  identities; core IDs keep their native short spelling. Reviewed commands use
+  explicit tap-qualified targets, including core, so another installed tap cannot
+  redirect the native command. Discover resolves catalog sources separately from
+  installed aliases. Conflicting sources remain visible with an identity issue;
+  they never establish that a package is current or successfully updated.
 - **Go:** inventory/install; the adapter recognizes binaries via Go build
   metadata in GOBIN/GOPATH. This does not prove they were installed with `go install`.
   The pinned adapter's version probe is corrected to `go version` through mpm's

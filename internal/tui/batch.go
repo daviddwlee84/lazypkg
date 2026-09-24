@@ -7,7 +7,6 @@ import (
 	"io"
 	"slices"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/daviddwlee84/lazypkg/internal/domain"
@@ -47,28 +46,19 @@ func packageView(view viewID) bool { return view == installedView || view == upd
 func clonePackages(packages []domain.Package) []domain.Package {
 	return domain.CloneSnapshot(domain.Snapshot{Packages: packages}).Packages
 }
-func (m *Model) packageCoverage(view viewID, p domain.Package) domain.Coverage {
-	s := &m.states[view]
-	for _, coverage := range s.snapshot.Coverage {
-		if coverage.Manager == p.Manager && (coverage.Instance == "" || p.Instance == "" || coverage.Instance == p.Instance) {
-			if observationExpired(coverage.ObservedAt, time.Now()) || s.stale && !s.streaming {
-				coverage.Stale = true
-			}
-			return coverage
-		}
-	}
-	return domain.Coverage{Manager: p.Manager, State: "pending", Stale: s.stale}
-}
 func (m *Model) upgradeEligibility(view viewID, p domain.Package) (bool, string) {
 	if !packageView(view) {
 		return false, "Upgrade selection is available in Installed and Updates."
 	}
-	for _, manager := range m.managers {
-		if manager.ID == p.Manager {
-			return domain.BatchUpgradeEligibility(p, manager, []domain.Coverage{m.packageCoverage(view, p)})
+	manager := domain.Manager{}
+	for _, candidate := range m.managers {
+		if candidate.ID == p.Manager {
+			manager = candidate
+			break
 		}
 	}
-	return false, "Provider discovery is incomplete."
+	reason := domain.BatchUpgradeBlocker(p, manager)
+	return reason == "", reason
 }
 func (m *Model) toggleMark(key string) {
 	if !packageView(m.view) || m.managerFocus {
@@ -292,10 +282,7 @@ func (m *Model) acceptBatchExecuted(msg batchExecutedMsg) tea.Cmd {
 	for i, item := range m.batch.history {
 		m.lastResult.Steps = append(m.lastResult.Steps, domain.StepResult{ID: fmt.Sprintf("%d. %s / %s", i+1, providerLabel(item.Entry.Package.Manager), item.Entry.Package.ID), Status: item.State, Message: item.Message})
 	}
-	for i := range m.states {
-		m.cancelView(viewID(i))
-	}
-	m.invalidateInventories()
+	m.invalidateViews()
 	s := &m.states[m.batch.origin]
 	for _, result := range msg.result.Entries {
 		if result.State == "success" || result.State == "current" {
@@ -308,8 +295,9 @@ func (m *Model) acceptBatchExecuted(msg batchExecutedMsg) tea.Cmd {
 		}
 	}
 	s.markOrder = slices.DeleteFunc(s.markOrder, func(key string) bool { _, ok := s.marks[key]; return !ok })
-	m.status = msg.result.Message
-	return tea.Batch(m.loadManagers(), m.loadView(m.batch.origin))
+	m.status = ""
+	m.saveBatchResult()
+	return m.refreshAfterMutation(m.batch.origin)
 }
 func (m *Model) resumeBatch(skip bool) tea.Cmd {
 	remaining := clonePackages(m.batch.result.Remaining)
@@ -322,10 +310,13 @@ func (m *Model) resumeBatch(skip bool) tea.Cmd {
 		m.batch.history = append(m.batch.history, domain.BatchUpgradeItemResult{Entry: domain.BatchUpgradeEntry{ID: target, Package: first}, State: "skipped", Message: "Skipped by user"})
 		remaining = slices.DeleteFunc(remaining, func(p domain.Package) bool { return domain.BatchUpgradeTargetKey(p) == target })
 		m.batch.result.Remaining = remaining
+		m.saveBatchResult()
 	}
 	if len(remaining) == 0 {
 		m.batch.result.Paused = false
-		m.status = "No remaining targets. Completed changes are retained."
+		m.batch.result.Message = "No remaining targets. Completed changes are retained."
+		m.saveBatchResult()
+		m.status = ""
 		return nil
 	}
 	return m.refreshBatch(domain.BatchUpgradeRequest{Targets: remaining, Source: "resume"})
@@ -336,6 +327,7 @@ func (m *Model) closeBatch() {
 	}
 	m.batch.generation++
 	m.batch.loading = false
+	m.status = ""
 	m.modal = noModal
 	m.modalOffset = 0
 }
@@ -395,7 +387,7 @@ func (m *Model) batchReviewText() string {
 	lines := []string{fmt.Sprintf("%d planned / %d grouped targets · %s", ready, len(m.batch.plan.Entries), m.batch.request.Source), fmt.Sprintf("%d selected targets are hidden by the current filter and included.", m.batch.hidden), "One confirmation authorizes only this frozen list. Native prompts remain interactive.", "A failure or changed plan pauses the batch; completed changes remain."}
 	for i, entry := range m.batch.plan.Entries {
 		p := entry.Package
-		lines = append(lines, "", fmt.Sprintf("%d. [%s] %s / %s", i+1, entry.State, providerLabel(p.Manager), p.ID), "Observed: "+strings.Join(entry.ObservedVersions, ", ")+" → "+orUnknown(entry.TargetVersion))
+		lines = append(lines, "", fmt.Sprintf("%d. [%s] %s / %s", i+1, entry.State, providerLabel(p.Manager), p.ID), batchVersionText(entry))
 		if entry.Reason != "" {
 			lines = append(lines, entry.Reason)
 		}
@@ -514,7 +506,7 @@ func (m *Model) acceptBatchRefresh(msg batchRefreshMsg) tea.Cmd {
 				continue
 			}
 			for _, c := range msg.snapshot.Coverage {
-				if c.Manager == p.Manager && c.State == "complete" && !c.Stale && !observationExpired(c.ObservedAt, time.Now()) && (c.Instance == "" || c.Instance == p.Instance) {
+				if c.Manager == p.Manager && c.State == "complete" && !c.Stale && (c.Instance == "" || c.Instance == p.Instance) {
 					fresh = append(fresh, p)
 					break
 				}
@@ -527,4 +519,41 @@ func (m *Model) acceptBatchRefresh(msg batchRefreshMsg) tea.Cmd {
 		}
 	}
 	return m.planBatch(domain.BatchUpgradeRequest{Targets: targets, Source: "resume"})
+}
+
+func batchVersionText(entry domain.BatchUpgradeEntry) string {
+	observed := strings.Join(entry.ObservedVersions, ", ")
+	if observed == "" {
+		observed = entry.Package.Version
+	}
+	if observed == "" {
+		observed = "not reported"
+	}
+	target := entry.TargetVersion
+	if target == "" {
+		target = entry.Package.Latest
+	}
+	if entry.State == "current" {
+		return "Installed: " + observed + " · no available upgrade"
+	}
+	if entry.State == "excluded" {
+		versions := []string{}
+		for _, p := range entry.Targets {
+			if p.Version != "" && !slices.Contains(versions, p.Version) {
+				versions = append(versions, p.Version)
+			}
+		}
+		if len(versions) > 0 {
+			observed = strings.Join(versions, ", ")
+		}
+		text := "Selected: " + observed
+		if target != "" {
+			text += " · observed candidate: " + target
+		}
+		return text
+	}
+	if target == "" {
+		return "Installed: " + observed + " · target not determined"
+	}
+	return "Installed: " + observed + " → " + target
 }

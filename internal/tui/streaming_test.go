@@ -178,7 +178,24 @@ func TestMutationCompletionRejectsLateHiddenViewStreams(t *testing.T) {
 	m.planGeneration = 9
 	m.Update(executedMsg{generation: 9, result: domain.ActionResult{Message: "changed"}})
 	applyEvent(m, hidden, baseEvent("brew", "base", domain.Package{Manager: "brew", ID: "pre-mutation"}))
-	if len(m.states[updatesView].snapshot.Packages) > 0 || m.states[updatesView].loading {
+	if len(m.states[updatesView].snapshot.Packages) > 0 || m.states[updatesView].generation == hidden.target.generation {
 		t.Fatal("late hidden read restored pre-mutation inventory")
+	}
+}
+
+func TestSessionMemoryBaseAndDonePreserveSelectableObservation(t *testing.T) {
+	m, _ := batchFixture(t)
+	stream := streamFixture(m, installedView)
+	p := domain.Package{Manager: "brew", ID: "alpha", Version: "1", Scope: "global"}
+	event := baseEvent("brew", "base", p)
+	event.Cached = true
+	event.Snapshot.Coverage[0].ObservedAt = time.Now().Add(-24 * time.Hour)
+	applyEvent(m, stream, event)
+	applyEvent(m, stream, domain.QueryEvent{Stage: "done", Snapshot: event.Snapshot})
+	if !hasAction(m, "upgrade") || !hasAction(m, "remove") || m.states[installedView].snapshot.Packages[0].InventoryStale {
+		t.Fatal("reused session memory was treated as an unverified disk seed")
+	}
+	if !m.states[installedView].snapshot.Coverage[0].ObservedAt.Equal(event.Snapshot.Coverage[0].ObservedAt) {
+		t.Fatal("session reuse fabricated an observation time")
 	}
 }

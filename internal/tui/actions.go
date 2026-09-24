@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/daviddwlee84/lazypkg/internal/domain"
@@ -45,11 +44,7 @@ func (m *Model) actions() []binding {
 	ready := !s.loading && !s.stale && s.err == nil && !s.retainedManagers[p.Manager]
 	if s.streaming {
 		ready = s.providers[p.Manager].ready
-		for _, coverage := range s.snapshot.Coverage {
-			if coverage.Manager == p.Manager && observationExpired(coverage.ObservedAt, time.Now()) {
-				ready = false
-			}
-		}
+
 	}
 	if !ready {
 		return out
@@ -76,10 +71,10 @@ func (m *Model) actions() []binding {
 	if m.view != installedView && m.view != updatesView {
 		return nil
 	}
-	if manager.Supports("upgrade") && !m.pendingActivation(p) {
+	if manager.Supports("upgrade") && !m.pendingActivation(p) && domain.BatchUpgradeBlocker(*p, *manager) == "" {
 		out = append(out, binding{"u", "upgrade", "upgrade"})
 	}
-	if manager.Supports("remove") {
+	if manager.Supports("remove") && !domain.ProtectedBackendPackage(*p) {
 		out = append(out, binding{"x", "remove", "remove"})
 	}
 	if p.Manager == "mise" && m.activationVersion(p) != "" && manager.Supports("activate") {
@@ -398,9 +393,9 @@ func (m *Model) helpText() string {
 		"Browse", "↑/↓ or j/k   Select an item", "Tab/Shift+Tab   Move focus between managers and items",
 		"←/→ or h/l   Change view; 1–5 jump directly", "Home/End or gg/G   First/last item", "Ctrl+d/u   Half page; Ctrl+f/b or PgDn/PgUp   Full page",
 		"Enter   Inspect selected item; Esc returns", "/   Filter; in Discover, enter a remote search",
-		"While typing, letters remain text. Enter accepts the query; Esc clears it.", "r   Refresh the current view; Esc cancels a pending read",
+		"While typing, letters remain text. Enter accepts the query; Esc clears it.", "r   Refresh the current observation; no periodic refresh or expiry", "Updates loads once in the background after Installed starts returning data.", "Esc cancels a pending read; v reopens the most recent operation result.",
 		"", "Manage", "s   Set up the backend or additional managers", "e   Read errors and partial-coverage details", "v   View the last operation result",
-		"Space/click checkbox   Mark a fresh, eligible package in Installed or Updates", "Ctrl+A   Toggle all eligible packages in the current filter, across all pages", "u   Upgrade all selected packages (including hidden marks), or the current package", "U   Review all filtered package results; Managers U opens manager maintenance", "Marks are independent per view; changing provider scope clears them.", "i   Install a Discover result", "u   Upgrade an installed package when supported", "x   Review removal; a   Review mise global activation", "d   Diagnose a package's first recorded command across all providers",
+		"Space/click marker   Select package observations; changes are verified during review", "Ctrl+A   Toggle selectable packages in the current filter, across all pages", "u   Upgrade all selected packages (including hidden marks), or the current package", "U   Review all filtered package results; Managers U opens manager maintenance", "Marks are independent per view; changing provider scope clears them.", "i   Install a Discover result", "u   Upgrade an installed package when supported", "x   Review removal; a   Review mise global activation", "d   Diagnose a package's first recorded command across all providers",
 		"R   Resolve a recorded command: choose what to keep, review one removal at a time", "U   Manager maintenance queue; each update/refresh needs a separate review", "p   Preview a context prompt, then c copies or e exports exactly that Markdown",
 		"Only applicable actions appear in the footer. Every change requires a plan and y to confirm.",
 		"", "Providers & mouse", "f   Choose groups or saved sets; Space/click loads a preset or toggles a manager", "[ / ]   Move a selected manager earlier/later in the picker priority order", "Enter applies the draft once; S saves a named set and can make it the default", "M   Toggle mouse capture; tabs, rows, visible buttons and checkboxes are clickable", "Wheel scrolls the hovered pane. Dragging off a button cancels the click.", "Managers: b toggles detected/all catalog; r forces update checks; u reviews an owner update",

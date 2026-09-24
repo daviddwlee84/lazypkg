@@ -50,29 +50,30 @@ type Evidence struct {
 	Detail string `json:"detail"`
 }
 type Package struct {
-	Extension         *GHExtension `json:"extension,omitempty"`
-	Manager           string       `json:"manager"`
-	ID                string       `json:"id"`
-	Name              string       `json:"name,omitempty"`
-	Version           string       `json:"version,omitempty"`
-	Latest            string       `json:"latest,omitempty"`
-	LatestInstalled   bool         `json:"latest_installed,omitempty"`
-	Description       string       `json:"description,omitempty"`
-	Scope             string       `json:"scope"`
-	Root              string       `json:"root,omitempty"`
-	Commands          []string     `json:"commands,omitempty"`
-	ExecutablePaths   []string     `json:"executable_paths,omitempty"`
-	Evidence          []Evidence   `json:"evidence,omitempty"`
-	Active            bool         `json:"active,omitempty"`
-	Global            bool         `json:"global,omitempty"`
-	ConfigSource      string       `json:"config_source,omitempty"`
-	Instance          string       `json:"instance,omitempty"`
-	Candidate         bool         `json:"candidate,omitempty"`
-	InstallState      string       `json:"install_state,omitempty"`
-	InstalledVersions []string     `json:"installed_versions,omitempty"`
-	InventoryAt       time.Time    `json:"inventory_at,omitempty"`
-	InventoryStale    bool         `json:"inventory_stale,omitempty"`
-	PathMatches       []Executable `json:"path_matches,omitempty"`
+	Identity          *PackageIdentity `json:"identity,omitempty"`
+	Extension         *GHExtension     `json:"extension,omitempty"`
+	Manager           string           `json:"manager"`
+	ID                string           `json:"id"`
+	Name              string           `json:"name,omitempty"`
+	Version           string           `json:"version,omitempty"`
+	Latest            string           `json:"latest,omitempty"`
+	LatestInstalled   bool             `json:"latest_installed,omitempty"`
+	Description       string           `json:"description,omitempty"`
+	Scope             string           `json:"scope"`
+	Root              string           `json:"root,omitempty"`
+	Commands          []string         `json:"commands,omitempty"`
+	ExecutablePaths   []string         `json:"executable_paths,omitempty"`
+	Evidence          []Evidence       `json:"evidence,omitempty"`
+	Active            bool             `json:"active,omitempty"`
+	Global            bool             `json:"global,omitempty"`
+	ConfigSource      string           `json:"config_source,omitempty"`
+	Instance          string           `json:"instance,omitempty"`
+	Candidate         bool             `json:"candidate,omitempty"`
+	InstallState      string           `json:"install_state,omitempty"`
+	InstalledVersions []string         `json:"installed_versions,omitempty"`
+	InventoryAt       time.Time        `json:"inventory_at,omitempty"`
+	InventoryStale    bool             `json:"inventory_stale,omitempty"`
+	PathMatches       []Executable     `json:"path_matches,omitempty"`
 }
 
 func (p Package) Key() string {
@@ -83,9 +84,10 @@ func (p Package) Key() string {
 }
 
 type Issue struct {
-	Manager string `json:"manager,omitempty"`
-	Message string `json:"message"`
-	Kind    string `json:"kind,omitempty"`
+	PackageID string `json:"package_id,omitempty"`
+	Manager   string `json:"manager,omitempty"`
+	Message   string `json:"message"`
+	Kind      string `json:"kind,omitempty"`
 }
 type Coverage struct {
 	Enrichment string    `json:"enrichment,omitempty"`
@@ -96,14 +98,19 @@ type Coverage struct {
 	Stale      bool      `json:"stale,omitempty"`
 	Message    string    `json:"message,omitempty"`
 }
+type CachePolicy string
+
+const CacheSession CachePolicy = "session"
+
 type PackageQuery struct {
-	Kind           string   `json:"kind"`
-	Query          string   `json:"query,omitempty"`
-	Managers       []string `json:"managers,omitempty"`
-	Group          string   `json:"group,omitempty"`
-	Set            string   `json:"set,omitempty"`
-	Refresh        bool     `json:"refresh,omitempty"`
-	DeferInventory bool     `json:"defer_inventory,omitempty"`
+	CachePolicy    CachePolicy `json:"cache_policy,omitempty"`
+	Kind           string      `json:"kind"`
+	Query          string      `json:"query,omitempty"`
+	Managers       []string    `json:"managers,omitempty"`
+	Group          string      `json:"group,omitempty"`
+	Set            string      `json:"set,omitempty"`
+	Refresh        bool        `json:"refresh,omitempty"`
+	DeferInventory bool        `json:"defer_inventory,omitempty"`
 }
 type Snapshot struct {
 	Packages          []Package  `json:"packages"`
@@ -163,17 +170,20 @@ type Step struct {
 	GuideURL    string   `json:"guide_url,omitempty"`
 }
 type ActionPlan struct {
-	ProviderContext string           `json:"provider_context,omitempty"`
-	GHExtension     *GHExtensionPlan `json:"gh_extension,omitempty"`
-	Resolution      *ResolutionPlan  `json:"resolution,omitempty"`
-	Kind            string           `json:"kind"`
-	Title           string           `json:"title"`
-	Request         ActionRequest    `json:"request"`
-	Steps           []Step           `json:"steps"`
-	Warnings        []string         `json:"warnings,omitempty"`
-	Preview         string           `json:"preview,omitempty"`
-	SetupIDs        []string         `json:"setup_ids,omitempty"`
-	ManagerUpdate   *ManagerHealth   `json:"manager_update,omitempty"`
+	ProviderInstance string           `json:"provider_instance,omitempty"`
+	ProviderIdentity *PackageIdentity `json:"provider_identity,omitempty"`
+	ProviderTarget   string           `json:"provider_target,omitempty"`
+	ProviderContext  string           `json:"provider_context,omitempty"`
+	GHExtension      *GHExtensionPlan `json:"gh_extension,omitempty"`
+	Resolution       *ResolutionPlan  `json:"resolution,omitempty"`
+	Kind             string           `json:"kind"`
+	Title            string           `json:"title"`
+	Request          ActionRequest    `json:"request"`
+	Steps            []Step           `json:"steps"`
+	Warnings         []string         `json:"warnings,omitempty"`
+	Preview          string           `json:"preview,omitempty"`
+	SetupIDs         []string         `json:"setup_ids,omitempty"`
+	ManagerUpdate    *ManagerHealth   `json:"manager_update,omitempty"`
 }
 
 type ManagerPreferences struct {

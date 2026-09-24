@@ -4,7 +4,6 @@ import (
 	"context"
 	"slices"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/daviddwlee84/lazypkg/internal/domain"
@@ -13,6 +12,7 @@ import (
 type inventoryState struct {
 	snapshot               domain.Snapshot
 	loading, loaded, stale bool
+	attempted, needsReload bool
 	generation             uint64
 	cancel                 context.CancelFunc
 	err                    error
@@ -28,31 +28,6 @@ type healthMsg struct {
 	generation uint64
 	health     []domain.ManagerHealth
 	err        error
-}
-
-// Match the shared service's inventory lifetime. Provider observation times,
-// rather than the time an aggregate response arrived, own freshness.
-const inventoryTTL = 60 * time.Second
-
-func observationExpired(observedAt, now time.Time) bool {
-	return observedAt.IsZero() || observedAt.After(now) || now.Sub(observedAt) >= inventoryTTL
-}
-
-func (s *inventoryState) expire(now time.Time) {
-	if !s.loaded {
-		return
-	}
-	if len(s.snapshot.Coverage) == 0 {
-		s.stale = s.stale || observationExpired(s.snapshot.ObservedAt, now)
-		return
-	}
-	for i := range s.snapshot.Coverage {
-		coverage := &s.snapshot.Coverage[i]
-		if coverage.Stale || observationExpired(coverage.ObservedAt, now) {
-			coverage.Stale = true
-			s.stale = true
-		}
-	}
 }
 
 func (m *Model) effectiveManagers() []string {
@@ -90,7 +65,6 @@ func (m *Model) ensureInventory(force bool) tea.Cmd {
 		cached = &inventoryState{}
 		m.inventories[key] = cached
 	}
-	cached.expire(time.Now())
 	if s := &m.states[installedView]; s.loading && s.scopeKey == key && !force {
 		m.attachDiscover()
 		return nil
@@ -98,7 +72,7 @@ func (m *Model) ensureInventory(force bool) tea.Cmd {
 	if s := &m.states[installedView]; force && s.loading && s.scopeKey == key {
 		m.cancelView(installedView)
 	}
-	if !force && (cached.loading || cached.loaded && !cached.stale) {
+	if !force && (cached.loading || (cached.loaded || cached.attempted) && !cached.needsReload) {
 		m.attachDiscover()
 		return nil
 	}
@@ -109,8 +83,10 @@ func (m *Model) ensureInventory(force bool) tea.Cmd {
 	cached.cancel = cancel
 	cached.generation++
 	cached.loading = true
+	cached.attempted = true
+	cached.needsReload = false
 	generation := cached.generation
-	request := domain.PackageQuery{Kind: "installed", Managers: m.effectiveManagers(), Refresh: force}
+	request := domain.PackageQuery{Kind: "installed", Managers: m.effectiveManagers(), Refresh: force, CachePolicy: domain.CacheSession}
 	cached.providers = make(map[string]providerState)
 	m.attachDiscover()
 	return m.startStream(ctx, request, streamTarget{inventoryKey: key, generation: generation})
@@ -162,6 +138,8 @@ func (m *Model) cacheInstalled(s *viewState) {
 	}
 	cached.generation++
 	cached.loading = false
+	cached.attempted = true
+	cached.needsReload = false
 	if s.loaded {
 		cached.snapshot = domain.CloneSnapshot(s.snapshot)
 		cached.loaded = true
@@ -188,7 +166,6 @@ func (m *Model) attachDiscover() {
 	var inventory domain.Snapshot
 	cached := m.inventories[m.scopeKey()]
 	if cached != nil {
-		cached.expire(time.Now())
 		inventory = domain.CloneSnapshot(cached.snapshot)
 	}
 	// Search can finish before an inventory started from another view. Represent
@@ -207,7 +184,7 @@ func (m *Model) attachDiscover() {
 				coverage.State = "failed"
 				coverage.Message = cached.err.Error()
 			}
-			if cached != nil && cached.loaded && !cached.loading {
+			if cached != nil && cached.loaded && !cached.loading && cached.err == nil {
 				coverage.State = "unsupported"
 			}
 			inventory.Coverage = append(inventory.Coverage, coverage)
@@ -216,16 +193,15 @@ func (m *Model) attachDiscover() {
 	s.snapshot = domain.AttachInventory(s.candidates, inventory)
 	// The shared service may have a newer observation than this UI cache. Never
 	// overwrite it with an older installed version or an older negative result.
-	now := time.Now()
 	for i := range s.snapshot.Packages {
 		p := &s.snapshot.Packages[i]
 		for _, candidate := range s.candidates.Packages {
-			if candidate.Key() == p.Key() && (candidate.InstallState == "installed" || candidate.InstallState == "not_installed") && candidate.InventoryAt.After(p.InventoryAt) {
+			if candidate.Key() == p.Key() && (candidate.InstallState == "installed" || candidate.InstallState == "not_installed") && !candidate.InventoryStale && candidate.InventoryAt.After(p.InventoryAt) {
 				p.InstallState = candidate.InstallState
 				p.Version = candidate.Version
 				p.InstalledVersions = append([]string(nil), candidate.InstalledVersions...)
 				p.InventoryAt = candidate.InventoryAt
-				p.InventoryStale = candidate.InventoryStale || observationExpired(candidate.InventoryAt, now)
+				p.InventoryStale = candidate.InventoryStale
 				p.Commands = append([]string(nil), candidate.Commands...)
 				p.ExecutablePaths = append([]string(nil), candidate.ExecutablePaths...)
 				p.Evidence = append([]domain.Evidence(nil), candidate.Evidence...)
@@ -244,6 +220,7 @@ func (m *Model) invalidateInventories() {
 		cached.generation++
 		cached.loading = false
 		cached.stale = true
+		cached.needsReload = true
 		for i := range cached.snapshot.Coverage {
 			cached.snapshot.Coverage[i].Stale = true
 		}
@@ -324,6 +301,8 @@ func installationLabel(p *domain.Package) string {
 		} else {
 			label = "Installed; version unavailable"
 		}
+	case "identity_unknown":
+		label = "Installation not confirmed: package identity unresolved"
 	case "not_installed":
 		label = "Not installed via " + p.Manager
 	case "checking":

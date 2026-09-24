@@ -71,7 +71,7 @@ func (m *Model) acceptPreferences(msg preferencesMsg) tea.Cmd {
 		}
 	}
 	m.attachDiscover()
-	return nil
+	return m.maybeWarmUpdates()
 }
 
 func (m *Model) applyScope(ids []string, name string) tea.Cmd {
@@ -95,10 +95,17 @@ func (m *Model) applyScope(ids []string, name string) tea.Cmd {
 			m.states[i].marks = nil
 			m.states[i].markOrder = nil
 		}
-		m.cancelView(viewID(i))
+		if changed {
+			m.cancelView(viewID(i))
+			m.states[i].needsReload = true
+		}
 		m.reconcile(viewID(i), false)
 	}
 	m.attachDiscover()
+	if !changed {
+		return nil
+	}
+	m.warmInstalledReady = false
 	return m.loadView(m.view)
 }
 

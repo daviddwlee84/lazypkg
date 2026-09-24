@@ -126,24 +126,23 @@ func TestMarksStayPerViewAndNeverRebindVersionOrInstance(t *testing.T) {
 		t.Fatal("provider scope did not clear marks")
 	}
 }
-func TestMarksExcludeStaleUnsupportedAndPendingActivation(t *testing.T) {
+func TestMarksAllowOldUnknownAndStaleObservationsButExcludeKnownBlockers(t *testing.T) {
 	m, _ := batchFixture(t)
 	s := &m.states[installedView]
 	s.snapshot.Packages[0].InventoryStale = true
+	s.snapshot.Packages[0].Version = ""
 	s.snapshot.Packages[2].LatestInstalled = true
+	s.snapshot.Coverage[0].ObservedAt = time.Now().Add(-24 * time.Hour)
 	press(m, "ctrl+a")
-	if len(s.marks) != 1 || s.marks[s.markOrder[0]].ID != "bravo" {
-		t.Fatal("ineligible rows selected")
+	if len(s.marks) != 2 {
+		t.Fatal("old or unknown observations were not selectable")
 	}
-	s.marks = nil
-	s.markOrder = nil
-	s.snapshot.Packages[0].InventoryStale = false
-	s.snapshot.Coverage[0].ObservedAt = time.Now().Add(-time.Minute * 2)
 	press(m, "ctrl+a")
 	if len(s.marks) != 0 {
-		t.Fatal("expired observation enabled marking")
+		t.Fatal("old selections could not be cancelled")
 	}
 }
+
 func TestBatchPauseRecheckAndSkipAlwaysNeedAnotherReview(t *testing.T) {
 	m, f := batchFixture(t)
 	press(m, "ctrl+a")

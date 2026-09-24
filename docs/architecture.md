@@ -31,8 +31,13 @@ five-second native timeout per manager. Scope policy lives in the generator.
 Public `uv` aliases `uvx`; `uv-pip` names mpm's environment-specific `uv` adapter.
 
 Inventory coverage records complete/failed/unavailable/unsupported/excluded
-states, manager instance and observation time. The service caches inventory for
-60 seconds for Installed/Updates and detection for five seconds. Complete
+states, manager instance and observation time. Default service queries cache
+inventory for 60 seconds and detection for five seconds. TUI browsing explicitly
+requests `CacheSession`, preserving observations and failed-refresh evidence until
+manual refresh or invalidation. Time passage does not change selection eligibility.
+An attempted read is distinct from a view that needs reloading, so switching to a
+failed/cancelled view does not silently retry. Updates warms once after the first
+usable Installed base batch, without waiting for optional enrichment. Complete
 provider batches can also seed startup from a private disk cache up to 24 hours
 old. Disk seeds are always stale until live validation; context fingerprints
 include platform, cwd, PATH and provider namespace environment settings, with
@@ -43,6 +48,16 @@ installed versions without comparing them to the remote version. Same-name PATH
 observations remain separate. Relevance precedes installed-source preference,
 which precedes the selected manager order. TUI inventory generations, cache age
 and stable candidate keys preserve selection as asynchronous joins finish.
+
+Homebrew inventory uses native `full_name`/`full_token` and receipt tap evidence
+to reconcile mpm's short Installed IDs with qualified Updates IDs. Catalog selectors
+have a separate resolution path: bare `brew info` can prefer an installed tap,
+so Discover uses explicit catalog namespaces and retains qualified search hints.
+Metadata queries are deduplicated and batched; alias sets never establish equality
+between different canonical IDs. Unknown identity prevents absence/current claims.
+Query cache schema 2 rejects older observations without these identity semantics.
+Package plans bind both logical identity and a fully qualified `ProviderTarget`;
+the exact native selector is used for preview and execution, including core.
 
 `internal/backend` owns the version-gated mpm boundary. JSON is a manager-keyed
 object with package records and per-manager errors, even when the process exits

@@ -52,7 +52,7 @@ func (a *App) queryDiskDir() string {
 	if c.CacheDir == "" || c.QueryCache != nil && !*c.QueryCache {
 		return ""
 	}
-	return filepath.Join(c.CacheDir, "queries-v1")
+	return filepath.Join(c.CacheDir, "queries-v2")
 }
 func (a *App) queryDiskPath(contextKey, kind, id string) string {
 	dir := a.queryDiskDir()
@@ -75,7 +75,7 @@ func (a *App) loadQueryDisk(contextKey, kind, id string) (queryDisk, bool) {
 	if err = json.NewDecoder(io.LimitReader(f, 8<<20)).Decode(&record); err != nil {
 		return record, false
 	}
-	if record.Schema != 1 || record.Context != contextKey || record.Kind != kind || record.Manager.ID != id || len(record.Snapshot.Coverage) != 1 {
+	if record.Schema != 2 || record.Context != contextKey || record.Kind != kind || record.Manager.ID != id || len(record.Snapshot.Coverage) != 1 {
 		return record, false
 	}
 	c := record.Snapshot.Coverage[0]
@@ -85,6 +85,9 @@ func (a *App) loadQueryDisk(contextKey, kind, id string) (queryDisk, bool) {
 	}
 	for _, p := range record.Snapshot.Packages {
 		if p.Manager != id {
+			return queryDisk{}, false
+		}
+		if (id == "brew" || id == "cask") && (p.Identity == nil || p.Identity.State != "verified" || p.Identity.CanonicalID == "" || p.ID != p.Identity.CanonicalID) {
 			return queryDisk{}, false
 		}
 	}
@@ -100,7 +103,7 @@ func (a *App) saveQueryDisk(contextKey, kind string, m domain.Manager, s domain.
 	if os.MkdirAll(filepath.Dir(path), 0700) != nil {
 		return
 	}
-	data, err := json.Marshal(queryDisk{1, contextKey, kind, m, s})
+	data, err := json.Marshal(queryDisk{2, contextKey, kind, m, s})
 	if err != nil || len(data) > 8<<20 {
 		return
 	}

@@ -281,7 +281,7 @@ func (m *Model) afterWorkflowExecution(msg executedMsg) (tea.Cmd, bool) {
 	switch m.planReturn {
 	case resolutionModal:
 		m.status = resultText(msg.result, msg.err) + " · reassessing installed instances"
-		return tea.Batch(m.loadConflict(m.workflow.name), m.loadManagers()), true
+		return tea.Batch(m.loadConflict(m.workflow.name), m.loadManagers(), m.loadView(updatesView)), true
 	case maintenanceModal:
 		status := "completed"
 		if msg.err != nil {
@@ -292,7 +292,7 @@ func (m *Model) afterWorkflowExecution(msg executedMsg) (tea.Cmd, bool) {
 		}
 		m.workflow.attempted[m.workflow.activeJob] = status
 		m.status = "Previous job " + status + ". Rechecking the remaining queue; each item needs its own review."
-		return tea.Batch(m.loadMaintenance(true), m.loadManagers()), true
+		return tea.Batch(m.loadMaintenance(true), m.loadManagers(), m.loadView(updatesView)), true
 	}
 	return nil, false
 }
