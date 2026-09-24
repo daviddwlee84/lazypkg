@@ -97,7 +97,11 @@ Windows and Linux. It uses mpm 8.0.1 subprocess JSON as its main package backend
 - Paging uses the active rendered viewport: Ctrl+d/u half-page, Ctrl+f/b and
   PgDn/PgUp full-page. Text-input and native-terminal editing take precedence.
   Package marks persist across text filters but clear when manager scope changes.
-- This repository has no published release/install channel. Do not claim a
-  cross-build proves native Windows/Linux installation or terminal behavior.
+- Tagged source installations use `go install
+  github.com/daviddwlee84/lazypkg/cmd/lazypkg@VERSION`; repeating it with `@latest`
+  updates Go-installed copies. There are no prebuilt assets or verified package
+  recipes yet. Do not claim a cross-build proves native Windows/Linux terminal
+  or package-manager behavior. Checkout versions use BaseVersion + `-dev`;
+  tagged installations obtain their version from Go build metadata.
 
 Keep this file grounded in the repository as implementation changes.

@@ -5,11 +5,36 @@ installed, choose an installation source, and understand which executable PATH
 will find. Go provides the CLI/TUI; [Meta Package Manager](https://mpm.run/)
 provides most package operations.
 
-The current local release is **v0.1.1**, targeting macOS, Windows and Linux.
+The current version is **v0.1.2**, targeting macOS, Windows and Linux.
 Native macOS read-only checks, an isolated uv tool lifecycle and an isolated
 mise/npm manager repair are part of local verification. Windows/Linux native
 installer and terminal
 acceptance must be run on those platforms; cross-compilation is not that proof.
+
+## Install or upgrade
+
+Requires **Go 1.26 or newer**. Install the tagged source version:
+
+```sh
+go install github.com/daviddwlee84/lazypkg/cmd/lazypkg@v0.1.2
+lazypkg --version
+```
+
+To update an existing Go-installed executable to the latest tagged version:
+
+```sh
+go install github.com/daviddwlee84/lazypkg/cmd/lazypkg@latest
+```
+
+Go writes the executable to `GOBIN`, or to `bin` under the first `GOPATH` directory
+when `GOBIN` is unset. Inspect `go env GOBIN GOPATH` and include that bin directory
+in your PATH. A binary you moved elsewhere must be replaced at that location.
+`@latest` selects a version tag, rather than the newest commit on `main`.
+See [the changelog](CHANGELOG.md) for version changes.
+
+This is a source installation channel. Prebuilt release archives and verified
+package-manager recipes are not provided yet. `lazypkg upgrade` updates a selected
+managed package; update lazypkg itself with the Go command above.
 
 ## Run from this checkout
 
@@ -418,9 +443,9 @@ scope policy and add contract/native verification. Unknown scope is passive
 until reviewed; manually editing generated JSON is not the maintenance path.
 CI checks the generated artifact against the pinned environment.
 
-There are no published lazypkg releases or verified package-manager recipes
-yet. Rebuild this checkout to update a development binary. An application
-self-updater is deliberately deferred until versioned installation channels
-exist; `upgrade` currently updates a selected managed package, not lazypkg.
+Rebuild this checkout to update a development binary. An application self-updater
+is deliberately deferred while distribution uses Go source installation; use
+the explicit Go install/update commands above. Local checkout builds report
+`v0.1.2-dev`; tagged Go installations report their module version.
 
 See [architecture](docs/architecture.md) and [verification](docs/verification.md).

@@ -1,6 +1,6 @@
 # Verification record
 
-## Unreleased workflows — 2026-09-25
+## v0.1.2 workflows — 2026-09-25
 
 The implementation retains mpm 8.0.1 and was checked with the active mise Go
 1.27.0 environment. A login shell selected Homebrew Go 1.27.1 while retaining
@@ -42,7 +42,7 @@ restoration. All mutations in that PTY remain the six isolated fake operations.
 
 The full race suite, vet, native build and Linux/Windows amd64 cross-builds passed.
 
-### Other unreleased workflows
+### Other v0.1.2 workflows
 
 GitHub extension checks used native gh 2.101.0 and a private lazypkg query cache.
 `list --manager gh-ext --json` returned all three registered extensions with
@@ -223,5 +223,6 @@ mutations still need disposable platform environments. Manager recipes other
 than the isolated npm repair have fixture coverage, not a claim of real upgrades
 on this development machine.
 
-Local Git tags identify v0.1.0 and v0.1.1; they are not published release channels.
+The v0.1.2 source channel uses a public Git tag and Go module installation;
+prebuilt binary archives and package-manager recipes are not provided.
 No host package installations or shell profiles were changed by these tests.

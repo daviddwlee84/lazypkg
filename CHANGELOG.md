@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.1.2 — 2026-09-25
+
 - Reconcile Homebrew tap identities across inventory, Updates, Discover and
   operations; preserve fully qualified native targets and expose source conflicts.
 - Replace checkbox rows with compact selection/restriction markers and separate
