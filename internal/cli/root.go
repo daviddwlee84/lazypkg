@@ -115,6 +115,7 @@ func newRoot(service domain.Service) *cobra.Command {
 	o := &options{override: service}
 	root := &cobra.Command{Use: "lazypkg", Short: "See, search and manage software across package managers", Version: version(), SilenceErrors: true, SilenceUsage: true, Args: cobra.NoArgs}
 	root.AddCommand(resolutionCommand(o), promptCommand(o))
+	root.AddCommand(batchUpgradeCommand(o))
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usageError{err} })
 	root.PersistentFlags().StringVar(&o.config, "config", "", "Path to TOML configuration")
 	root.PersistentFlags().StringVar(&o.mpm, "mpm", "", "Explicit mpm executable (tested version "+domain.MPMVersion+")")

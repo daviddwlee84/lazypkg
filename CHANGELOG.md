@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Enable GitHub CLI extensions in global/user inventory, with native per-item
+  update checks, bound upgrade/removal plans and local/pinned/modified guidance.
+- Add Installed/Updates multi-selection and filtered batch upgrades, a shared
+  `upgrade-batch` command, one batch review and pause/recheck after uncertain results.
+- Add Vim half/full-page movement across lists and overlays, preserve input
+  editing shortcuts, and fix setup scrolling and duplicate coverage messages.
 - Stream Installed/Updates provider batches before slow queries and ownership
   enrichment finish; share in-flight work and seed marked stale disk snapshots.
 - Add guided conflict assessment and bound removals for Brew formulae, uv tools

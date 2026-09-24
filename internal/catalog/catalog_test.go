@@ -65,7 +65,7 @@ func TestAliasesCapabilitiesAndScope(t *testing.T) {
 	if npm.Requirement != ">=11.10.0" || !strings.Contains(npm.Reason, "min-release-age") {
 		t.Fatal(npm)
 	}
-	if len(DefaultIDs()) != 18 || slices.Contains(DefaultIDs(), "uv-pip") {
+	if len(DefaultIDs()) != 19 || !slices.Contains(DefaultIDs(), "gh-ext") || slices.Contains(DefaultIDs(), "uv-pip") {
 		t.Fatal(DefaultIDs())
 	}
 }
@@ -95,6 +95,7 @@ func TestComponentMetadata(t *testing.T) {
 		{"vim-pack", "hosted", "launcher", "nvim"},
 		{"emacs", "hosted", "launcher", "emacs"},
 		{"yazi", "executable", "component", "ya"},
+		{"gh-ext", "hosted", "launcher", "gh"},
 	} {
 		e, ok := Lookup(tc.id)
 		if !ok || e.ComponentKind != tc.kind || e.VersionSubject != tc.subject || e.Launcher != tc.launcher {

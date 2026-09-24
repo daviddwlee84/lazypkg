@@ -7,6 +7,39 @@ The implementation retains mpm 8.0.1 and was checked with the active mise Go
 mise's GOROOT; checks therefore used the inherited, consistent environment.
 No shell configuration or toolchain installation was changed to run tests.
 
+GitHub extension checks used native gh 2.101.0 and a private lazypkg query cache.
+`list --manager gh-ext --json` returned all three registered extensions with
+complete coverage: `dlvhdr/gh-dash` v4.26.0 (binary), `meiji163/gh-notify`
+dff46349 (Git), and `remcostoeten/gh-select` v2.3.0 (binary). The native per-item
+update checks reported no available updates. Batch dry-runs from Installed
+reported three current targets; an explicit gh-dash target reported one, and
+an empty Updates selection produced a valid empty plan. These checks did not
+execute any extension upgrade or removal.
+An install dry-run with a fixture repository ID also confirmed that the native
+mpm preview preserves `owner/gh-repository` and includes the provider binding;
+this checks command construction, not whether that fixture repository exists.
+
+Fixtures cover remote/binary/local/pinned/modified extension inventory, opaque
+tags and hashes, failed partial checks, old gh without dry-run support, exact
+repository/host/root/launcher/pin drift, removal and verified update versus no-op.
+Installation tests also change gh's configured default host without changing
+its config directory, and ensure credentials are not exported in plan bindings.
+Batch tests cover frozen selections, individual manager commands, grouped mise
+versions without activation, dependency-already-updated skips, writer exclusion,
+cancellation, failure pauses and explicit re-review. A deterministic clock test
+advances planning by over a minute to ensure later targets do not expire merely
+while their overview is prepared; execution still performs fresh checks.
+
+Paging fixtures cover actual viewport sizes, list boundaries, setup selection,
+end-to-up scrolling and input editing ownership. The full fake-service PTY
+exercises checkbox selection, hidden marks, one batch approval, failure pause,
+explicit recheck/review, Vim paging and restored terminal state. It records six
+fake mutations: three single jobs, two batch attempts and one approved retry.
+
+The full race suite, `go vet ./...`, catalog parity, macOS build and Linux/Windows
+amd64 cross-builds passed. The generated catalog now enables 19 global/user
+providers; native Windows/Linux extension behavior still needs platform acceptance.
+
 The opt-in read-only profiling test records service events, not terminal paint
 times. It isolates Rustup settings and query caches:
 
@@ -32,8 +65,7 @@ provider, shared-work cancellation, complete base data before enrichment, disk
 seeds and empty replacement, cache invalidation, stable selection, component
 version identity, manager queue grouping, exact-prefix removal, and prompt
 render/export consistency. The real fake-service PTY additionally exercises
-guided removal, maintenance skip/recheck and prompt export, with three explicitly
-approved fake mutations and restored terminal state.
+guided removal, maintenance skip/recheck and prompt export.
 
 Native conflict inspection identified two yt-dlp installations: uv tools and
 one Brew keg with two equivalent paths. Brew's copy is required by `summarize`,

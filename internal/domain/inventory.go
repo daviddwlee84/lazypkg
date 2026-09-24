@@ -26,6 +26,10 @@ func CloneSnapshot(s Snapshot) Snapshot {
 	s.InventoryCoverage = append([]Coverage(nil), s.InventoryCoverage...)
 	for i := range s.Packages {
 		p := &s.Packages[i]
+		if p.Extension != nil {
+			copy := *p.Extension
+			p.Extension = &copy
+		}
 		p.Commands = append([]string(nil), p.Commands...)
 		p.ExecutablePaths = append([]string(nil), p.ExecutablePaths...)
 		p.Evidence = append([]Evidence(nil), p.Evidence...)

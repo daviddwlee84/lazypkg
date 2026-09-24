@@ -3796,9 +3796,10 @@
       "cli_names": [
         "gh"
       ],
-      "component_kind": "executable",
+      "component_kind": "hosted",
       "groups": [
-        "unknown"
+        "extensions",
+        "global"
       ],
       "id": "gh-ext",
       "keywords": [
@@ -3808,7 +3809,7 @@
       "launcher": "gh",
       "maintained": true,
       "maintenance": "",
-      "name": "GitHub CLI extensions",
+      "name": "gh extensions",
       "platforms": [
         "almalinux",
         "alpine",
@@ -3867,9 +3868,9 @@
       ],
       "reason": "mpm 8.0.1 requires >=2.0.0.",
       "requirement": ">=2.0.0",
-      "scope": "unknown",
+      "scope": "global",
       "source_url": "https://github.com/kdeldycke/meta-package-manager/blob/v8.0.1/meta_package_manager/managers/gh_ext.toml",
-      "version_subject": "component"
+      "version_subject": "launcher"
     },
     {
       "backend_id": "ghcup",

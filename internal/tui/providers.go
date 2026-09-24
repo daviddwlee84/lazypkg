@@ -75,6 +75,7 @@ func (m *Model) acceptPreferences(msg preferencesMsg) tea.Cmd {
 }
 
 func (m *Model) applyScope(ids []string, name string) tea.Cmd {
+	changed := !slices.Equal(m.effectiveManagers(), uniqueIDs(ids))
 	m.filtering = false
 	m.input.Blur()
 	m.managerIDs = uniqueIDs(ids)
@@ -90,6 +91,10 @@ func (m *Model) applyScope(ids []string, name string) tea.Cmd {
 	m.modalOffset = 0
 	m.status = "Provider selection applies to this session."
 	for i := range m.states {
+		if changed {
+			m.states[i].marks = nil
+			m.states[i].markOrder = nil
+		}
 		m.cancelView(viewID(i))
 		m.reconcile(viewID(i), false)
 	}
@@ -215,6 +220,9 @@ func (m *Model) startSaveSet() tea.Cmd {
 }
 func (m *Model) providersKey(key tea.KeyPressMsg) tea.Cmd {
 	choices := m.providerChoices()
+	if m.pageKey(key.String()) {
+		return nil
+	}
 	switch key.String() {
 	case "esc", "ctrl+c":
 		m.modal = noModal
@@ -222,10 +230,6 @@ func (m *Model) providersKey(key tea.KeyPressMsg) tea.Cmd {
 		m.providerPicker.position = clamp(m.providerPicker.position-1, 0, len(choices)-1)
 	case "down", "j":
 		m.providerPicker.position = clamp(m.providerPicker.position+1, 0, len(choices)-1)
-	case "pgup":
-		m.providerPicker.position = clamp(m.providerPicker.position-m.pageSize(), 0, len(choices)-1)
-	case "pgdown":
-		m.providerPicker.position = clamp(m.providerPicker.position+m.pageSize(), 0, len(choices)-1)
 	case "home", "g":
 		m.providerPicker.position = 0
 	case "end", "G":

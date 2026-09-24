@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -21,7 +22,7 @@ func TestPTYHelper(t *testing.T) {
 	}
 	f := &fakeService{
 		managers: []domain.Manager{{ID: "brew", Name: "Homebrew", Available: true, Supported: true, Status: "available", Version: "6.0.0", Capabilities: []string{"installed", "search", "install", "upgrade", "remove"}}},
-		snapshot: domain.Snapshot{Packages: []domain.Package{{Manager: "brew", ID: "alpha", Version: "1.0", Latest: "1.1", Scope: "user", Evidence: []domain.Evidence{{Kind: "recorded", Source: "brew", Detail: "Fixture ownership"}}}, {Manager: "brew", ID: "bravo", Version: "2.0", Scope: "user"}}, ObservedAt: time.Now()},
+		snapshot: domain.Snapshot{Packages: []domain.Package{{Manager: "brew", ID: "alpha", Version: "1.0", Latest: "1.1", Scope: "global", Evidence: []domain.Evidence{{Kind: "recorded", Source: "brew", Detail: "Fixture ownership"}}}, {Manager: "brew", ID: "bravo", Version: "2.0", Scope: "global"}}, ObservedAt: time.Now()},
 		options:  []domain.SetupOption{{ID: "mpm", Name: "mpm backend", Recommended: true, Description: "Fixture setup; nothing will be installed."}},
 	}
 	if err := Run(context.Background(), &ptyService{fakeService: f}, "installed"); err != nil {
@@ -30,7 +31,10 @@ func TestPTYHelper(t *testing.T) {
 	fmt.Fprintln(os.Stdout, "TUI_EXIT_OK")
 }
 
-type ptyService struct{ *fakeService }
+type ptyService struct {
+	*fakeService
+	batchFailed bool
+}
 
 func (f *ptyService) Query(ctx context.Context, request domain.PackageQuery) (domain.Snapshot, error) {
 	timer := time.NewTimer(300 * time.Millisecond)
@@ -123,4 +127,29 @@ func (f *ptyService) MaintenanceQueue(context.Context, []string, bool) (domain.M
 }
 func (f *ptyService) PlanManagerUpdate(context.Context, string) (domain.ActionPlan, error) {
 	return domain.ActionPlan{Title: "Update fixture manager", Kind: "manager-update", Request: domain.ActionRequest{Operation: "manager-update", Manager: "brew"}, ManagerUpdate: &domain.ManagerHealth{Manager: "brew", ApplySupported: true}}, nil
+}
+
+func (f *ptyService) ExecuteBatchUpgrade(ctx context.Context, plan domain.BatchUpgradePlan, in io.Reader, out, errout io.Writer) (domain.BatchUpgradeResult, error) {
+	result := domain.BatchUpgradeResult{Message: "Fixture batch completed"}
+	for i, entry := range plan.Entries {
+		action, err := f.Execute(ctx, *entry.Plan, in, out, errout)
+		if err == nil && len(plan.Entries) > 1 && i == 1 && !f.batchFailed {
+			f.batchFailed = true
+			err = errors.New("fixture batch pause")
+		}
+		state := "success"
+		if err != nil {
+			state = "failed"
+		}
+		result.Entries = append(result.Entries, domain.BatchUpgradeItemResult{Entry: entry, State: state, Result: action})
+		if err != nil {
+			result.Paused = true
+			result.Message = "Fixture batch paused"
+			for _, rest := range plan.Entries[i:] {
+				result.Remaining = append(result.Remaining, rest.Package)
+			}
+			return result, err
+		}
+	}
+	return result, nil
 }

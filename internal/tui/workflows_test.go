@@ -110,7 +110,7 @@ func TestResolutionKeepsExplicitIdentityAndReviewsOneRemoval(t *testing.T) {
 }
 func TestMaintenanceReviewSkipStopAndRecheckEachJob(t *testing.T) {
 	m, f := workflowFixture(t)
-	deliver(m, press(m, "U"))
+	deliver(m, m.openMaintenance())
 	if m.modal != maintenanceModal || len(f.updates) != 0 {
 		t.Fatal("queue auto-planned or failed to open")
 	}
@@ -273,7 +273,7 @@ func TestNonActionableWorkflowRowsDoNotAdvertiseReview(t *testing.T) {
 		}
 	}
 	press(m, "esc")
-	deliver(m, press(m, "U"))
+	deliver(m, m.openMaintenance())
 	press(m, "G")
 	for _, button := range m.modalButtons() {
 		if button.key == "enter" {

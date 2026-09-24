@@ -431,6 +431,9 @@ func (m *Model) workflowKey(key tea.KeyPressMsg) tea.Cmd {
 		return m.exportInput(key)
 	}
 	name := key.String()
+	if m.pageKey(name) {
+		return nil
+	}
 	if name == "esc" || name == "ctrl+c" || name == "q" {
 		m.closeWorkflow()
 		return nil
@@ -442,13 +445,9 @@ func (m *Model) workflowKey(key tea.KeyPressMsg) tea.Cmd {
 		case "e":
 			return m.exportPrompt()
 		case "up", "k":
-			m.modalOffset = max(0, m.modalOffset-1)
+			m.scrollModalBy(-1)
 		case "down", "j":
-			m.modalOffset++
-		case "pgup":
-			m.modalOffset = max(0, m.modalOffset-m.pageSize())
-		case "pgdown":
-			m.modalOffset += m.pageSize()
+			m.scrollModalBy(1)
 		}
 		return nil
 	}
@@ -463,14 +462,6 @@ func (m *Model) workflowKey(key tea.KeyPressMsg) tea.Cmd {
 			return m.loadConflict(m.workflow.name)
 		}
 		return m.loadMaintenance(true)
-	}
-	if name == "pgup" {
-		m.modalOffset = max(0, m.modalOffset-m.pageSize())
-		return nil
-	}
-	if name == "pgdown" {
-		m.modalOffset += m.pageSize()
-		return nil
 	}
 	previousPosition := m.workflow.position
 	count := len(m.workflow.queue.Jobs)
@@ -620,7 +611,7 @@ func (m *Model) workflowView() string {
 		}
 		lines = append(lines, "")
 		description := wrapLines(m.workflowDescription(), m.width-4)
-		available := max(1, m.height-7-len(lines))
+		available := m.workflowDetailRows()
 		offset := clamp(m.modalOffset, 0, max(0, len(description)-available))
 		lines = append(lines, description[offset:]...)
 	}

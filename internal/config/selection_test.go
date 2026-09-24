@@ -89,7 +89,7 @@ func TestLegacyDefaultAndMouse(t *testing.T) {
 		t.Fatal("explicit mouse false ignored")
 	}
 	defaults, err := (Config{}).Select(domain.PackageQuery{})
-	if err != nil || len(defaults) != 18 || slices.Contains(defaults, "uv-pip") || !slices.Contains(defaults, "go") {
+	if err != nil || len(defaults) != 19 || slices.Contains(defaults, "uv-pip") || !slices.Contains(defaults, "go") || !slices.Contains(defaults, "gh-ext") {
 		t.Fatal(defaults, err)
 	}
 	prefs := c.Preferences()

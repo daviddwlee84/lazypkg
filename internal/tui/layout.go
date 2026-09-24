@@ -44,6 +44,9 @@ func (m *Model) layout() screenLayout {
 		if m.modal == planModal {
 			id += fmt.Sprintf(":%d", m.planGeneration)
 		}
+		if m.modal == batchReviewModal || m.modal == batchResultModal {
+			id += fmt.Sprintf(":%d", m.batch.generation)
+		}
 		l.targets = append(l.targets, hitTarget{id: id, kind: kind, value: value, rect: r})
 	}
 	if m.modal != noModal {
@@ -143,6 +146,13 @@ func (m *Model) layout() screenLayout {
 		start := clamp(m.states[m.view].offset, 0, max(0, len(rows)-count))
 		for i := start; i < min(start+count, len(rows)); i++ {
 			if y := 6 + i - start; y+1 <= l.items.y+l.items.h-1 {
+				if packageView(m.view) && rows[i].pkg != nil {
+					_, marked := m.states[m.view].marks[rows[i].key]
+					eligible, _ := m.upgradeEligibility(m.view, *rows[i].pkg)
+					if marked || eligible {
+						add("mark", rows[i].key, rectangle{l.items.x + 3, y, 3, 1})
+					}
+				}
 				add("row", rows[i].key, rectangle{l.items.x + 1, y, l.items.w - 2, 1})
 			}
 		}
@@ -202,6 +212,9 @@ func (m *Model) footerButtons() ([]uiButton, []uiButton) {
 		first = append(first, uiButton{"b", label})
 	}
 	extra := []uiButton{}
+	if packageView(m.view) && !m.managerFocus {
+		extra = append(extra, uiButton{" ", "Space mark"}, uiButton{"ctrl+a", "^A all"}, uiButton{"U", "U filtered"})
+	}
 	if m.view == managersView {
 		extra = append(extra, uiButton{"U", "U maintain"}, uiButton{"p", "p prompt"})
 	} else if m.commandTarget() != "" {
@@ -212,6 +225,21 @@ func (m *Model) footerButtons() ([]uiButton, []uiButton) {
 }
 func (m *Model) modalButtons() []uiButton {
 	switch m.modal {
+	case batchReviewModal:
+		buttons := []uiButton{{"esc", "Cancel"}}
+		if m.batchExecutable() {
+			buttons = append(buttons, uiButton{"y", "y Upgrade batch"})
+		}
+		if !m.batch.loading {
+			buttons = append(buttons, uiButton{"r", "r recheck"})
+		}
+		return buttons
+	case batchResultModal:
+		buttons := []uiButton{{"esc", "Stop / back"}}
+		if len(m.batch.result.Remaining) > 0 {
+			buttons = append(buttons, uiButton{"r", "r recheck remaining"}, uiButton{"s", "s skip paused"})
+		}
+		return buttons
 	case setupModal:
 		return []uiButton{{"enter", "Enter review"}, {"esc", "Esc back"}, {"r", "r refresh"}}
 	case providersModal:
@@ -344,7 +372,7 @@ func (m *Model) mouseMessage(message tea.Msg) tea.Cmd {
 			case setupModal:
 				m.setup.position = clamp(m.setup.position+delta, 0, len(m.setup.options)-1)
 			default:
-				m.modalOffset = max(0, m.modalOffset+delta)
+				m.scrollModalBy(delta)
 			}
 			return nil
 		}
@@ -356,7 +384,7 @@ func (m *Model) mouseMessage(message tea.Msg) tea.Cmd {
 			m.managerFocus = false
 			m.move(delta)
 		} else if l.details.contains(msg.X, msg.Y) {
-			m.detailOffset = max(0, m.detailOffset+delta)
+			m.scrollDetailsBy(delta)
 		}
 	}
 	return nil
@@ -366,6 +394,9 @@ func (m *Model) activateHit(target hitTarget) tea.Cmd {
 	case "tab":
 		index, _ := strconv.Atoi(target.value)
 		return m.switchView(index)
+	case "mark":
+		m.managerFocus = false
+		m.toggleMark(target.value)
 	case "row":
 		m.managerFocus = false
 		m.detailOffset = 0
@@ -435,6 +466,9 @@ func (m *Model) activateHit(target hitTarget) tea.Cmd {
 	return nil
 }
 func keyMessage(value string) tea.KeyPressMsg {
+	if strings.HasPrefix(value, "ctrl+") {
+		return tea.KeyPressMsg{Code: []rune(strings.TrimPrefix(value, "ctrl+"))[0], Mod: tea.ModCtrl}
+	}
 	switch value {
 	case "enter":
 		return tea.KeyPressMsg{Code: tea.KeyEnter}

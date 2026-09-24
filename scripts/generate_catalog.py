@@ -15,13 +15,13 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "internal/catalog/catalog.json"
 GLOBAL = {
     "brew", "cask", "apt", "dnf", "pacman", "winget", "scoop", "choco",
-    "npm", "uvx", "cargo", "mise", "flatpak", "snap", "pipx", "go", "gem", "rustup",
+    "npm", "uvx", "cargo", "mise", "flatpak", "snap", "pipx", "go", "gem", "rustup", "gh-ext",
 }
 ENVIRONMENT = {"uv", "pip", "pip2", "pip3", "pipxu", "conda", "mamba", "micromamba", "pixi"}
 ECOSYSTEMS = {"pypi": "python", "npm": "node", "gem": "ruby", "cargo": "rust", "golang": "go", "deb": "debian", "rpm": "rpm", "alpm": "arch"}
 SHELL_COMPONENTS = {"antidote", "antigen", "fisher", "oh-my-fish", "zim", "zinit", "zplug"}
-HOSTED_COMPONENTS = {"lazy", "mason", "vim-pack", "emacs", "micro"}
-LAUNCHER_VERSION = {"vim-pack", "emacs", "micro"}
+HOSTED_COMPONENTS = {"lazy", "mason", "vim-pack", "emacs", "micro", "gh-ext"}
+LAUNCHER_VERSION = {"vim-pack", "emacs", "micro", "gh-ext"}
 
 
 def generate():
@@ -42,6 +42,8 @@ def generate():
         groups = {label for typ, label in ECOSYSTEMS.items() if backend_id in (PURL_MAP.get(typ) or ())}
         if backend_id in {"rustup"}:
             groups.add("rust")
+        if backend_id == "gh-ext":
+            groups.add("extensions")
         if backend_id in {"mise", "asdf", "rustup", "volta"}:
             groups.add("runtimes")
         if backend_id in {"brew", "cask", "apt", "dnf", "pacman", "winget", "scoop", "choco", "flatpak", "snap"}:
@@ -58,7 +60,7 @@ def generate():
             reason = "mpm 8.0.1 requires npm >=11.10.0 because that release introduced min-release-age; older npm silently ignores the release-age setting."
         entries.append({
             "id": public_id, "backend_id": backend_id,
-            "name": "uv tools" if backend_id == "uvx" else "uv pip environment" if backend_id == "uv" else manager.name,
+            "name": "uv tools" if backend_id == "uvx" else "uv pip environment" if backend_id == "uv" else "gh extensions" if backend_id == "gh-ext" else manager.name,
             "requirement": requirement,
             "capabilities": [op.name for op in Operations if implements(manager, op)],
             "platforms": sorted(p.id for p in manager.platforms),

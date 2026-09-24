@@ -61,6 +61,32 @@ service uses exact-version install/uninstall and explicit global `use --pin`;
 it never routes row removal through mpm's `uninstall --all`. PyPI lookup is a
 small exact-name HTTP adapter, not a search-engine replacement.
 
+The hosted `gh-ext` adapter has global/user scope and uses the native `gh`
+launcher for inventory, update checks, upgrades and removals. Search/install
+retain the pinned mpm adapter. Binary manifests, Git metadata and local links
+are read without executing extension commands. Per-extension dry-run support
+is feature-detected; old launchers retain inventory access without an unsafe
+fallback. Manager instances include the extension root and host/config context.
+Plans bind repository, host, root, launcher, pin state and full tag/commit
+identity because gh's native target matching can reduce a repository to its
+short name. Pinned/local/modified records remain visible with explicit limits;
+an explicitly reviewed pinned remote removal is supported. Update checks are
+bounded and noninteractive; failed checks never imply a current extension.
+Install previews additionally bind the resolved default host and configuration
+scope. Host selection retains only sorted configuration keys, never credentials.
+Discovery caches and shared work are separated by query context as well as epoch.
+
+`PlanBatchUpgrade` takes frozen package records, not a mutable view selector.
+Eligibility is shared with the TUI. It records exclusions and coalesces mise
+versions into one install plan. `ExecuteBatchUpgrade` holds the application's
+writer lock and calls the same internal single-operation executor; it never
+uses upgrade_all. Each item is freshly checked against the reviewed manager
+instance, observed versions, ownership root and plan. Failure, drift, cancellation
+or uncertain postchecks pause the queue and preserve remaining targets.
+Rechecking returns to a new overview before another approval. Marks use package
+identity, persist through text filtering and clear on manager scope changes.
+The CLI resolves selectors/filter once before calling this shared service.
+
 `internal/diagnostics` combines manager records with filesystem observations.
 Installation records, executable candidates and source evidence remain separate.
 Recorded entrypoints outside PATH are visible without becoming PATH winners.
@@ -114,6 +140,9 @@ Configuration saves preserve unrelated TOML content and file permissions, with
 digest checks, a cooperative lock and atomic replacement. Mouse hit targets
 share the rendered layout, and press/release identity checks prevent stale
 coordinates or overlay fall-through from approving an action.
+Half/full-page keyboard movement uses the active rendered viewport and clamps
+selection/scroll offsets together. Text fields handle editing keys before global
+navigation; native terminal handoff leaves native shortcuts untouched.
 
 `internal/process` is the shared executable/argv boundary. It applies explicit
 environment overlays, bounds captured output and resolves executables against
@@ -127,6 +156,8 @@ the child PATH. No plan preview is evaluated as shell code.
 - [WinGet list includes other installers](https://learn.microsoft.com/windows/package-manager/winget/list)
 - [uv tool lifecycle](https://docs.astral.sh/uv/concepts/tools/)
 - [mise configuration selection](https://mise.jdx.dev/configuration.html)
+- [GitHub CLI extension commands](https://cli.github.com/manual/gh_extension)
+- [GitHub CLI per-extension update checks](https://cli.github.com/manual/gh_extension_upgrade)
 
 Future mpm version support requires updating contract fixtures and testing the
 native commands, pinned generator dependencies and embedded catalog. CI runs

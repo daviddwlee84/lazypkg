@@ -90,8 +90,8 @@ func key(value string) tea.KeyPressMsg {
 	if code, ok := codes[value]; ok {
 		return tea.KeyPressMsg{Code: code}
 	}
-	if value == "ctrl+c" {
-		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
+	if strings.HasPrefix(value, "ctrl+") {
+		return tea.KeyPressMsg{Code: []rune(strings.TrimPrefix(value, "ctrl+"))[0], Mod: tea.ModCtrl}
 	}
 	if value == "shift+tab" {
 		return tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
@@ -628,4 +628,35 @@ func (f *fakeService) MaintenanceQueue(context.Context, []string, bool) (domain.
 }
 func (f *fakeService) RenderPrompt(context.Context, domain.PromptRequest) (domain.RenderedPrompt, error) {
 	return domain.RenderedPrompt{Markdown: "# Fixture prompt\n\nCurrent context only.\n"}, nil
+}
+
+func (f *fakeService) PlanBatchUpgrade(ctx context.Context, request domain.BatchUpgradeRequest) (domain.BatchUpgradePlan, error) {
+	plan := domain.BatchUpgradePlan{Request: request, Fingerprint: "fixture"}
+	for _, p := range request.Targets {
+		single, err := f.Plan(ctx, domain.ActionRequest{Manager: p.Manager, Package: p.ID, Operation: "upgrade"})
+		if err != nil {
+			return plan, err
+		}
+		plan.Entries = append(plan.Entries, domain.BatchUpgradeEntry{ID: domain.BatchUpgradeTargetKey(p), Package: p, State: "planned", ObservedVersions: []string{p.Version}, TargetVersion: p.Latest, Plan: &single})
+	}
+	return plan, nil
+}
+func (f *fakeService) ExecuteBatchUpgrade(ctx context.Context, plan domain.BatchUpgradePlan, in io.Reader, out, errout io.Writer) (domain.BatchUpgradeResult, error) {
+	result := domain.BatchUpgradeResult{Message: "Fixture batch completed"}
+	for i, entry := range plan.Entries {
+		action, err := f.Execute(ctx, *entry.Plan, in, out, errout)
+		state := "success"
+		if err != nil {
+			state = "failed"
+		}
+		result.Entries = append(result.Entries, domain.BatchUpgradeItemResult{Entry: entry, State: state, Result: action})
+		if err != nil {
+			result.Paused = true
+			for _, rest := range plan.Entries[i:] {
+				result.Remaining = append(result.Remaining, rest.Package)
+			}
+			return result, err
+		}
+	}
+	return result, nil
 }

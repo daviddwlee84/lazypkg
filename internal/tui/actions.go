@@ -20,6 +20,9 @@ func (m *Model) actions() []binding {
 	if m.modal != noModal && m.modal != detailsModal {
 		return nil
 	}
+	if packageView(m.view) && !m.managerFocus && len(m.states[m.view].marks) > 0 {
+		return []binding{{"u", fmt.Sprintf("upgrade %d selected", len(m.states[m.view].marks)), "batch-upgrade"}}
+	}
 	r, ok := m.selectedRow()
 	if !ok {
 		return nil
@@ -99,6 +102,9 @@ func (m *Model) requestAction(operation string) tea.Cmd {
 	}
 	if !eligible {
 		return nil
+	}
+	if operation == "batch-upgrade" {
+		return m.startBatchUpgrade("selected")
 	}
 	r, ok := m.selectedRow()
 	if !ok {
@@ -218,6 +224,9 @@ func (m *Model) reviewSetup() tea.Cmd {
 
 func (m *Model) modalKey(key tea.KeyPressMsg) tea.Cmd {
 	name := key.String()
+	if m.modal == batchReviewModal || m.modal == batchResultModal {
+		return m.batchKey(key)
+	}
 	if m.modal == resolutionModal || m.modal == maintenanceModal || m.modal == promptModal || m.modal == exportPromptModal {
 		return m.workflowKey(key)
 	}
@@ -226,6 +235,9 @@ func (m *Model) modalKey(key tea.KeyPressMsg) tea.Cmd {
 	}
 	if m.modal == versionModal || m.modal == saveSetModal {
 		return m.inputMessage(key)
+	}
+	if m.pageKey(name) {
+		return nil
 	}
 	if name == "esc" || name == "ctrl+c" {
 		m.closeModal()
@@ -310,17 +322,13 @@ func (m *Model) modalKey(key tea.KeyPressMsg) tea.Cmd {
 	}
 	switch name {
 	case "up", "k":
-		m.modalOffset = max(0, m.modalOffset-1)
+		m.scrollModalBy(-1)
 	case "down", "j":
-		m.modalOffset++
-	case "pgup":
-		m.modalOffset = max(0, m.modalOffset-m.pageSize())
-	case "pgdown":
-		m.modalOffset += m.pageSize()
+		m.scrollModalBy(1)
 	case "home", "g":
 		m.modalOffset = 0
 	case "end", "G":
-		m.modalOffset = 1 << 30
+		m.modalOffset = m.modalScrollLimit()
 	}
 	return nil
 }
@@ -330,6 +338,10 @@ func (m *Model) planExecutable() bool {
 }
 
 func (m *Model) closeModal() {
+	if m.modal == batchReviewModal || m.modal == batchResultModal {
+		m.closeBatch()
+		return
+	}
 	if m.modal == resolutionModal || m.modal == maintenanceModal || m.modal == promptModal || m.modal == exportPromptModal {
 		m.closeWorkflow()
 		return
@@ -384,11 +396,11 @@ func (m *Model) startManagerPlan(id string) tea.Cmd {
 func (m *Model) helpText() string {
 	lines := []string{
 		"Browse", "↑/↓ or j/k   Select an item", "Tab/Shift+Tab   Move focus between managers and items",
-		"←/→ or h/l   Change view; 1–5 jump directly", "Home/End or gg/G   First/last item",
+		"←/→ or h/l   Change view; 1–5 jump directly", "Home/End or gg/G   First/last item", "Ctrl+d/u   Half page; Ctrl+f/b or PgDn/PgUp   Full page",
 		"Enter   Inspect selected item; Esc returns", "/   Filter; in Discover, enter a remote search",
 		"While typing, letters remain text. Enter accepts the query; Esc clears it.", "r   Refresh the current view; Esc cancels a pending read",
 		"", "Manage", "s   Set up the backend or additional managers", "e   Read errors and partial-coverage details", "v   View the last operation result",
-		"i   Install a Discover result", "u   Upgrade an installed package when supported", "x   Review removal; a   Review mise global activation", "d   Diagnose a package's first recorded command across all providers",
+		"Space/click checkbox   Mark a fresh, eligible package in Installed or Updates", "Ctrl+A   Toggle all eligible packages in the current filter, across all pages", "u   Upgrade all selected packages (including hidden marks), or the current package", "U   Review all filtered package results; Managers U opens manager maintenance", "Marks are independent per view; changing provider scope clears them.", "i   Install a Discover result", "u   Upgrade an installed package when supported", "x   Review removal; a   Review mise global activation", "d   Diagnose a package's first recorded command across all providers",
 		"R   Resolve a recorded command: choose what to keep, review one removal at a time", "U   Manager maintenance queue; each update/refresh needs a separate review", "p   Preview a context prompt, then c copies or e exports exactly that Markdown",
 		"Only applicable actions appear in the footer. Every change requires a plan and y to confirm.",
 		"", "Providers & mouse", "f   Choose groups or saved sets; Space/click loads a preset or toggles a manager", "[ / ]   Move a selected manager earlier/later in the picker priority order", "Enter applies the draft once; S saves a named set and can make it the default", "M   Toggle mouse capture; tabs, rows, visible buttons and checkboxes are clickable", "Wheel scrolls the hovered pane. Dragging off a button cancels the click.", "Managers: b toggles detected/all catalog; r forces update checks; u reviews an owner update",
@@ -401,63 +413,7 @@ func (m *Model) helpText() string {
 	return strings.Join(lines, "\n")
 }
 
-func (m *Model) issuesText() string {
-	var lines []string
-	if m.managersErr != nil {
-		lines = append(lines, "Manager discovery: "+m.managersErr.Error())
-	}
-	if m.healthErr != nil {
-		lines = append(lines, "Manager update check: "+m.healthErr.Error())
-	}
-	if m.prefsErr != nil {
-		lines = append(lines, "Provider preferences: "+m.prefsErr.Error())
-	}
-	for _, manager := range m.managers {
-		for _, err := range manager.Errors {
-			lines = append(lines, manager.ID+": "+err)
-		}
-	}
-	s := &m.states[m.view]
-	if s.err != nil {
-		lines = append(lines, viewNames[m.view]+": "+s.err.Error())
-	}
-	for _, coverage := range s.snapshot.Coverage {
-		progress := s.providers[coverage.Manager]
-		label := coverage.Manager + ": " + coverage.State
-		if coverage.Stale {
-			label += " (stale)"
-		}
-		if progress.elapsed > 0 {
-			label += " · " + progress.elapsed.Round(time.Millisecond).String()
-		}
-		if coverage.Enrichment != "" {
-			label += " · ownership " + coverage.Enrichment
-		}
-		if coverage.Message != "" {
-			label += " · " + coverage.Message
-		}
-		lines = append(lines, label)
-	}
-	issues := s.snapshot.Issues
-	if m.view == diagnosticsView {
-		issues = s.report.Issues
-	}
-	for _, issue := range issues {
-		lines = append(lines, strings.TrimSpace(issue.Manager+": "+issue.Message))
-	}
-	if m.view == discoverView {
-		for _, coverage := range s.snapshot.InventoryCoverage {
-			if coverage.State != "complete" && coverage.State != "pending" {
-				lines = append(lines, coverage.Manager+" inventory: "+coverage.State+" "+coverage.Message)
-			}
-		}
-	}
-	if len(lines) == 0 {
-		lines = append(lines, "No errors reported for this view.")
-	}
-	lines = append(lines, "", "Press s from the dashboard to set up missing components.")
-	return strings.Join(lines, "\n\n")
-}
+func (m *Model) issuesText() string { return m.coverageText() }
 
 func resultText(result domain.ActionResult, err error) string {
 	var lines []string

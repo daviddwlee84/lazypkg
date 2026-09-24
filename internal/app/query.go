@@ -43,20 +43,24 @@ func (a *App) Managers(ctx context.Context) ([]domain.Manager, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	contextKey := a.queryContext()
 	a.cacheMu.Lock()
 	epoch := a.cacheEpoch
-	if len(a.managerCache) > 0 && time.Since(a.managerCacheAt) < 5*time.Second {
+	if len(a.managerCache) > 0 && a.managerCacheContext == contextKey && time.Since(a.managerCacheAt) < 5*time.Second {
 		out := append([]domain.Manager(nil), a.managerCache...)
 		a.cacheMu.Unlock()
 		return out, nil
 	}
 	a.cacheMu.Unlock()
-	out, err := a.managerJobs.do(ctx, fmt.Sprint(epoch), func(work context.Context) ([]domain.Manager, error) {
+	out, err := a.managerJobs.do(ctx, fmt.Sprintf("%d:%s", epoch, contextKey), func(work context.Context) ([]domain.Manager, error) {
 		m, err := a.provider(work)
 		if err != nil {
 			return nil, err
 		}
 		out, err := m.Managers(work)
+		if err == nil {
+			a.refineGH(work, out)
+		}
 		if err != nil {
 			a.mu.Lock()
 			if a.mpm == m {
@@ -64,11 +68,12 @@ func (a *App) Managers(ctx context.Context) ([]domain.Manager, error) {
 			}
 			a.mu.Unlock()
 		}
-		if err == nil && work.Err() == nil {
+		if err == nil && work.Err() == nil && a.queryContext() == contextKey {
 			a.cacheMu.Lock()
 			if epoch == a.cacheEpoch && !a.managerCacheAt.After(observedAt) {
 				a.managerCache = append([]domain.Manager(nil), out...)
 				a.managerCacheAt = observedAt
+				a.managerCacheContext = contextKey
 			}
 			a.cacheMu.Unlock()
 		}
@@ -81,6 +86,9 @@ func (a *App) mise() (backend.Mise, error) {
 	return backend.Mise{Path: p, Runner: a.Runner, Env: a.childEnv(), Timeout: a.settings().Timeout()}, err
 }
 func instance(m domain.Manager) string {
+	if m.Instance != "" {
+		return m.Instance
+	}
 	if path, err := filepath.EvalSymlinks(m.Path); err == nil {
 		return path
 	}
@@ -93,7 +101,9 @@ func (a *App) invalidateDetection() {
 	a.cacheMu.Lock()
 	a.cacheEpoch++
 	a.managerCache = nil
+	a.managerCacheContext = ""
 	a.mpm = nil
+	a.ghProviders = nil
 	a.cacheMu.Unlock()
 	a.mu.Unlock()
 }
@@ -107,6 +117,7 @@ func (a *App) invalidateInventory() {
 	a.inventory = nil
 	a.updateCache = nil
 	a.managerCache = nil
+	a.managerCacheContext = ""
 	a.managerCacheAt = time.Time{}
 	a.cacheMu.Unlock()
 	a.mu.Unlock()
@@ -329,6 +340,13 @@ func (a *App) read(ctx context.Context, q domain.PackageQuery, enrich, useCache 
 					} else {
 						result, e = mi.Outdated(ctx)
 					}
+				}
+			} else if m.ID == "gh-ext" && q.Kind != "search" {
+				g := a.ghProvider(m)
+				if q.Kind == "installed" {
+					result, e = g.Installed(ctx)
+				} else {
+					result, e = g.Outdated(ctx)
 				}
 			} else if m.ID == "uvx" && q.Kind == "search" {
 				result, e = backend.PyPIExact(ctx, a.HTTPClient, "", q.Query)

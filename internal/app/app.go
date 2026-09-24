@@ -25,31 +25,33 @@ import (
 )
 
 type App struct {
-	Version        string
-	Config         config.Config
-	Runner         process.Runner
-	Bootstrap      *bootstrap.Engine
-	HTTPClient     *http.Client
-	mu             sync.Mutex
-	mpm            *backend.MPM
-	writeMu        sync.Mutex
-	cacheMu        sync.Mutex
-	inventory      map[string]domain.Snapshot
-	updateCache    map[string]domain.Snapshot
-	providerJobs   sharedWork[*backend.MPM]
-	managerJobs    sharedWork[[]domain.Manager]
-	queryJobs      sharedWork[domain.Snapshot]
-	enrichmentJobs sharedWork[domain.Snapshot]
-	limitsOnce     sync.Once
-	querySem       chan struct{}
-	enrichmentSem  chan struct{}
-	diskMu         sync.Mutex
-	managerCache   []domain.Manager
-	managerCacheAt time.Time
-	cacheEpoch     uint64
-	memoryContext  string
-	maintenance    *maintenance.Engine
-	maintenanceEnv map[string]string
+	Version             string
+	Config              config.Config
+	Runner              process.Runner
+	Bootstrap           *bootstrap.Engine
+	HTTPClient          *http.Client
+	mu                  sync.Mutex
+	mpm                 *backend.MPM
+	writeMu             sync.Mutex
+	cacheMu             sync.Mutex
+	inventory           map[string]domain.Snapshot
+	updateCache         map[string]domain.Snapshot
+	providerJobs        sharedWork[*backend.MPM]
+	managerJobs         sharedWork[[]domain.Manager]
+	queryJobs           sharedWork[domain.Snapshot]
+	enrichmentJobs      sharedWork[domain.Snapshot]
+	limitsOnce          sync.Once
+	querySem            chan struct{}
+	enrichmentSem       chan struct{}
+	diskMu              sync.Mutex
+	managerCache        []domain.Manager
+	managerCacheAt      time.Time
+	managerCacheContext string
+	cacheEpoch          uint64
+	memoryContext       string
+	maintenance         *maintenance.Engine
+	maintenanceEnv      map[string]string
+	ghProviders         map[string]*backend.GHExtensions
 }
 
 func New(c config.Config) *App {
@@ -161,6 +163,26 @@ func (a *App) Plan(ctx context.Context, req domain.ActionRequest) (domain.Action
 	}
 	if !selected.Supports(req.Operation) {
 		return p, fmt.Errorf("%s does not support %s", req.Manager, req.Operation)
+	}
+	if req.Manager == "gh-ext" {
+		if req.Version != "" {
+			return p, fmt.Errorf("gh extension operations do not accept --version; pinning is a separate gh operation")
+		}
+		if err := backend.ValidateGHExtensionID(req.Package); err != nil {
+			return p, err
+		}
+		if req.Operation == "upgrade" || req.Operation == "remove" {
+			return a.ghProvider(*selected).Plan(ctx, req)
+		}
+		if req.Operation == "install" {
+			g := a.ghProvider(*selected)
+			hostContext, description, err := g.InstallContext()
+			if err != nil {
+				return p, err
+			}
+			p.ProviderContext = digestJSON([]string{"gh-install-v1", g.Instance(), a.queryContext(), hostContext})
+			p.Warnings = append(p.Warnings, description)
+		}
 	}
 	if req.Operation == "install" && req.Manager != "mise" {
 		ids, selectionErr := a.settings().Select(domain.PackageQuery{})
@@ -291,6 +313,9 @@ func (a *App) Plan(ctx context.Context, req domain.ActionRequest) (domain.Action
 	if req.Operation == "remove" {
 		p.Warnings = append(p.Warnings, "The selected manager may remove dependent files or run its uninstall scripts; review its native prompts.")
 	}
+	if req.Operation == "upgrade" {
+		p.Warnings = append(p.Warnings, "The native manager selects the version at execution time and may change required dependencies; the displayed latest version is not an exact version pin.")
+	}
 	return p, nil
 }
 func scoopRemove(path, pkg string) (domain.Command, error) {
@@ -308,6 +333,11 @@ func (a *App) Execute(ctx context.Context, p domain.ActionPlan, in io.Reader, ou
 		return domain.ActionResult{}, fmt.Errorf("another operation is already running")
 	}
 	defer a.writeMu.Unlock()
+	return a.execute(ctx, p, in, out, errout)
+}
+
+// execute is shared by single and aggregate operations. The caller owns writeMu.
+func (a *App) execute(ctx context.Context, p domain.ActionPlan, in io.Reader, out, errout io.Writer) (domain.ActionResult, error) {
 	if p.Kind == "resolution" {
 		result, err := a.resolutionEngine().Execute(ctx, p, in, out, errout)
 		a.invalidateInventory()
@@ -347,12 +377,55 @@ func (a *App) Execute(ctx context.Context, p domain.ActionPlan, in io.Reader, ou
 	if err = mpm.Recheck(ctx); err != nil {
 		return domain.ActionResult{}, err
 	}
+	if req.Manager == "gh-ext" && (req.Operation == "upgrade" || req.Operation == "remove") {
+		managers, err := a.Managers(ctx)
+		if err != nil {
+			return domain.ActionResult{}, err
+		}
+		for _, m := range managers {
+			if m.ID == "gh-ext" && m.Available {
+				result, err := a.ghProvider(m).Execute(ctx, p, in, out, errout)
+				a.invalidateInventory()
+				return result, err
+			}
+		}
+		return domain.ActionResult{}, fmt.Errorf("gh extension manager is unavailable; refresh before executing")
+	}
 	fresh, err := a.Plan(ctx, req)
 	if err != nil {
 		return domain.ActionResult{}, err
 	}
-	if fresh.Preview != p.Preview || !reflect.DeepEqual(fresh.Request, p.Request) || !reflect.DeepEqual(fresh.Warnings, p.Warnings) {
+	if fresh.ProviderContext != p.ProviderContext || fresh.Preview != p.Preview || !reflect.DeepEqual(fresh.Request, p.Request) || !reflect.DeepEqual(fresh.Warnings, p.Warnings) {
 		return domain.ActionResult{}, fmt.Errorf("operation or its known effects changed; review a new plan")
+	}
+	var priorVersion string
+	var supportsOutdated bool
+	if req.Operation == "upgrade" && req.Manager != "mise" {
+		managers, err := a.Managers(ctx)
+		if err != nil {
+			return domain.ActionResult{}, err
+		}
+		for _, m := range managers {
+			if m.ID == req.Manager {
+				supportsOutdated = m.Supports("outdated")
+			}
+		}
+		if !supportsOutdated {
+			before, err := a.packages(ctx, "installed", "", req.Manager, false)
+			if err != nil || !freshInventory(before, req.Manager) {
+				return domain.ActionResult{}, fmt.Errorf("cannot verify the pre-upgrade installation")
+			}
+			matches := 0
+			for _, v := range before.Packages {
+				if sameID(req.Manager, v.ID, req.Package) {
+					matches++
+					if matches > 1 {
+						return domain.ActionResult{}, fmt.Errorf("multiple installed records require an exact upgrade target")
+					}
+					priorVersion = v.Version
+				}
+			}
+		}
 	}
 	var c domain.Command
 	done := func() {}
@@ -390,6 +463,7 @@ func (a *App) Execute(ctx context.Context, p domain.ActionPlan, in io.Reader, ou
 		return r, e
 	}
 	found := false
+	var installedVersion string
 	for _, v := range s.Packages {
 		if !sameID(req.Manager, v.ID, req.Package) {
 			continue
@@ -401,6 +475,7 @@ func (a *App) Execute(ctx context.Context, p domain.ActionPlan, in io.Reader, ou
 			continue
 		}
 		found = true
+		installedVersion = v.Version
 	}
 	if req.Operation == "remove" {
 		found = !found
@@ -411,6 +486,16 @@ func (a *App) Execute(ctx context.Context, p domain.ActionPlan, in io.Reader, ou
 		return r, errors.New(r.Message)
 	}
 	if req.Operation == "upgrade" && req.Manager != "mise" {
+		if !supportsOutdated {
+			if priorVersion != "" && installedVersion != "" && installedVersion != priorVersion {
+				r.Steps[0].Status = "success"
+				r.Message = "Installed version changed from " + priorVersion + " to " + installedVersion + ". This provider cannot verify whether it is the latest release."
+				return r, nil
+			}
+			r.Steps[0].Status = "unverified"
+			r.Message = "The native upgrade returned success without a verified version change; this provider has no update-status query. Latest status remains unknown."
+			return r, errors.New(r.Message)
+		}
 		updates, e := a.packages(ctx, "outdated", "", req.Manager, false)
 		if e != nil || len(updates.Issues) != 0 {
 			r.Steps[0].Status = "unverified"

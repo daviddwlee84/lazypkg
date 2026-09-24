@@ -40,7 +40,7 @@ func (a *App) queryContext() string {
 			continue
 		}
 		upper := strings.ToUpper(k)
-		if upper == "PATH" || upper == "PATHEXT" || upper == "HOME" || upper == "USERPROFILE" || upper == "GOPATH" || upper == "GOBIN" || upper == "GOTOOLCHAIN" || upper == "SCOOP" || upper == "CHOCOLATEYINSTALL" || strings.HasPrefix(upper, "MISE_") || strings.HasPrefix(upper, "UV_") || strings.HasPrefix(upper, "NPM_CONFIG_") || strings.HasPrefix(upper, "GEM_") || strings.HasPrefix(upper, "BUNDLE_") || strings.HasPrefix(upper, "CARGO_") || strings.HasPrefix(upper, "RUSTUP_") || strings.HasPrefix(upper, "XDG_") {
+		if upper == "PATH" || upper == "PATHEXT" || upper == "HOME" || upper == "USERPROFILE" || upper == "LOCALAPPDATA" || upper == "GH_HOST" || upper == "GH_CONFIG_DIR" || upper == "GOPATH" || upper == "GOBIN" || upper == "GOTOOLCHAIN" || upper == "SCOOP" || upper == "CHOCOLATEYINSTALL" || strings.HasPrefix(upper, "MISE_") || strings.HasPrefix(upper, "UV_") || strings.HasPrefix(upper, "NPM_CONFIG_") || strings.HasPrefix(upper, "GEM_") || strings.HasPrefix(upper, "BUNDLE_") || strings.HasPrefix(upper, "CARGO_") || strings.HasPrefix(upper, "RUSTUP_") || strings.HasPrefix(upper, "XDG_") {
 			values[upper] = v
 		}
 	}

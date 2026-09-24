@@ -11,6 +11,7 @@ import (
 const MPMVersion = "8.0.1"
 
 type Manager struct {
+	Instance       string         `json:"instance,omitempty"`
 	ComponentKind  string         `json:"component_kind,omitempty"`
 	VersionSubject string         `json:"version_subject,omitempty"`
 	Launcher       string         `json:"launcher,omitempty"`
@@ -49,6 +50,7 @@ type Evidence struct {
 	Detail string `json:"detail"`
 }
 type Package struct {
+	Extension         *GHExtension `json:"extension,omitempty"`
 	Manager           string       `json:"manager"`
 	ID                string       `json:"id"`
 	Name              string       `json:"name,omitempty"`
@@ -161,15 +163,17 @@ type Step struct {
 	GuideURL    string   `json:"guide_url,omitempty"`
 }
 type ActionPlan struct {
-	Resolution    *ResolutionPlan `json:"resolution,omitempty"`
-	Kind          string          `json:"kind"`
-	Title         string          `json:"title"`
-	Request       ActionRequest   `json:"request"`
-	Steps         []Step          `json:"steps"`
-	Warnings      []string        `json:"warnings,omitempty"`
-	Preview       string          `json:"preview,omitempty"`
-	SetupIDs      []string        `json:"setup_ids,omitempty"`
-	ManagerUpdate *ManagerHealth  `json:"manager_update,omitempty"`
+	ProviderContext string           `json:"provider_context,omitempty"`
+	GHExtension     *GHExtensionPlan `json:"gh_extension,omitempty"`
+	Resolution      *ResolutionPlan  `json:"resolution,omitempty"`
+	Kind            string           `json:"kind"`
+	Title           string           `json:"title"`
+	Request         ActionRequest    `json:"request"`
+	Steps           []Step           `json:"steps"`
+	Warnings        []string         `json:"warnings,omitempty"`
+	Preview         string           `json:"preview,omitempty"`
+	SetupIDs        []string         `json:"setup_ids,omitempty"`
+	ManagerUpdate   *ManagerHealth   `json:"manager_update,omitempty"`
 }
 
 type ManagerPreferences struct {
@@ -233,6 +237,8 @@ type SetupOption struct {
 // Service is the single user-facing operation boundary. Execute never confirms;
 // callers must present Plan and collect approval before passing it to Execute.
 type Service interface {
+	PlanBatchUpgrade(context.Context, BatchUpgradeRequest) (BatchUpgradePlan, error)
+	ExecuteBatchUpgrade(context.Context, BatchUpgradePlan, io.Reader, io.Writer, io.Writer) (BatchUpgradeResult, error)
 	StreamQuery(context.Context, PackageQuery) <-chan QueryEvent
 	AssessConflict(context.Context, string) (ConflictAssessment, error)
 	PlanResolution(context.Context, ResolutionRequest) (ActionPlan, error)

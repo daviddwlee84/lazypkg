@@ -241,6 +241,13 @@ func (a *App) liveBatch(ctx context.Context, m domain.Manager, kind, contextKey 
 				s, err = mi.Outdated(ctx)
 			}
 		}
+	} else if m.ID == "gh-ext" {
+		g := a.ghProvider(m)
+		if kind == "installed" {
+			s, err = g.Installed(ctx)
+		} else {
+			s, err = g.Outdated(ctx)
+		}
 	} else {
 		var mpm *backend.MPM
 		mpm, err = a.provider(ctx)

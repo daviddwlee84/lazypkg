@@ -95,15 +95,19 @@ func (m *Model) tabs() string {
 }
 
 func (m *Model) contextLine() string {
-	manager := m.scopeName
+	manager := providerLabel(m.scopeName)
 	if manager == "" {
 		manager = "Configured default"
 	}
 	if ids := m.effectiveManagers(); len(ids) > 0 {
 		if len(ids) > 3 {
 			manager += fmt.Sprintf(" · %d providers", len(ids))
-		} else if len(ids) != 1 || manager != ids[0] {
-			manager += " · " + strings.Join(ids, ", ")
+		} else if len(ids) != 1 || manager != providerLabel(ids[0]) {
+			labels := append([]string(nil), ids...)
+			for i := range labels {
+				labels[i] = providerLabel(labels[i])
+			}
+			manager += " · " + strings.Join(labels, ", ")
 		}
 	}
 	manager = ansi.Truncate(clean(manager), max(15, m.width/2), "…")
@@ -159,7 +163,11 @@ func (m *Model) contextLine() string {
 	if s.query != "" {
 		query = " · / " + clean(s.query)
 	}
-	return " " + manager + " · " + state + query
+	marks := ""
+	if total, hidden := m.markCounts(m.view); total > 0 {
+		marks = fmt.Sprintf(" · %d selected (%d hidden)", total, hidden)
+	}
+	return " " + manager + marks + " · " + state + query
 }
 
 func (m *Model) managerPane(width, height int) string {
@@ -187,7 +195,7 @@ func (m *Model) managerPane(width, height int) string {
 		} else if manager.Path != "" {
 			mark = "!"
 		}
-		label := mark + " " + manager.ID
+		label := mark + " " + providerLabel(manager.ID)
 		if m.includesManager(manager.ID) {
 			label += " *"
 		}
@@ -232,15 +240,24 @@ func (m *Model) packagePane(width, height int) string {
 			if r.key == s.selected {
 				marker = "> "
 			}
+			if packageView(m.view) && r.pkg != nil {
+				check := "[-] "
+				if _, marked := s.marks[r.key]; marked {
+					check = "[x] "
+				} else if ok, _ := m.upgradeEligibility(m.view, *r.pkg); ok {
+					check = "[ ] "
+				}
+				marker += check
+			}
 			secondary := r.secondary
 			if r.manager != "" && m.view != managersView {
-				secondary = r.manager + " · " + secondary
+				secondary = providerLabel(r.manager) + " · " + secondary
 			}
 			available := max(1, width-4)
 			var value string
 			if available >= 38 {
 				right := min(25, available/2)
-				value = marker + line(clean(r.label), available-right-3) + " " + line(clean(secondary), right)
+				value = marker + line(clean(r.label), available-right-1-ansi.StringWidth(marker)) + " " + line(clean(secondary), right)
 			} else {
 				value = marker + clean(r.label)
 			}
@@ -280,8 +297,12 @@ func (m *Model) emptyText() string {
 	if m.view == discoverView && s.query == "" {
 		return "Find a package\n\nPress /, type a tool or package name, then Enter.\n\nChoose a result and press i to review installation.\n\nOnly available providers can be searched. uv tools uses exact PyPI names."
 	}
-	if len(s.snapshot.Issues) > 0 || len(s.report.Issues) > 0 {
+	failed, excluded := m.queryCoverageCounts()
+	if failed > 0 {
 		return "No results in the completed portion of this scan.\n\nSome providers could not be queried; this is not a complete empty inventory.\n\ne shows coverage details; r retries."
+	}
+	if excluded > 0 && len(s.snapshot.Packages) == 0 {
+		return "No packages were returned by the providers that support this query.\n\nSome selected providers are unavailable, unsupported or outside this scope.\ne explains coverage; f changes providers."
 	}
 	if s.query != "" || m.managerFilter != "" {
 		return "No items match this query or manager.\n\nEsc clears the query/filter.\nChoose All managers to broaden the view."
@@ -307,12 +328,12 @@ func (m *Model) statusLine() string {
 		return " " + clean(m.status)
 	}
 	s := &m.states[m.view]
-	issues := len(s.snapshot.Issues)
-	if m.view == diagnosticsView {
-		issues = len(s.report.Issues)
+	failed, excluded := m.queryCoverageCounts()
+	if failed > 0 {
+		return warningStyle.Render(fmt.Sprintf(" Partial results · %d provider issue(s) · e details", failed))
 	}
-	if issues > 0 {
-		return warningStyle.Render(fmt.Sprintf(" Partial results · %d issue(s) · e details", issues))
+	if excluded > 0 {
+		return muted.Render(fmt.Sprintf(" %d provider(s) excluded/unavailable · e coverage", excluded))
 	}
 	if s.err != nil || m.managersErr != nil {
 		return warningStyle.Render(" Read failed · e details · s setup · r retry")
@@ -321,7 +342,7 @@ func (m *Model) statusLine() string {
 		return " g… press g again for the first item"
 	}
 	if r, ok := m.selectedRow(); ok && r.pkg != nil {
-		return muted.Render(" " + clean(r.pkg.Manager+" / "+r.pkg.ID+" · "+orUnknown(r.pkg.Scope)))
+		return muted.Render(" " + clean(providerLabel(r.pkg.Manager)+" / "+r.pkg.ID+" · "+orUnknown(r.pkg.Scope)))
 	}
 	return muted.Render(" Changes are reviewed before execution.")
 }
@@ -337,7 +358,7 @@ func (m *Model) rowDetails(r row) string {
 		if latest == "" {
 			latest = "not reported by provider"
 		}
-		lines = append(lines, "", "Provider: "+p.Manager, "Installed: "+installationLabel(p), "Available version: "+latest, "Scope: "+orUnknown(p.Scope))
+		lines = append(lines, "", "Provider: "+providerLabel(p.Manager), "Installed: "+installationLabel(p), "Available version: "+latest, "Scope: "+orUnknown(p.Scope))
 		if !p.InventoryAt.IsZero() {
 			lines = append(lines, "Inventory observed: "+observed(p.InventoryAt))
 		}
@@ -349,6 +370,21 @@ func (m *Model) rowDetails(r row) string {
 		}
 		if m.states[m.view].retainedManagers[p.Manager] {
 			lines = append(lines, "", "STALE: retained from the previous inventory because this provider's refresh failed. Refresh before changing it.")
+		}
+		if p.Manager == "gh-ext" {
+			lines = append(lines, "", "Native command: gh extension", "Displayed version belongs to the extension; gh is its launcher.")
+			if extension := p.Extension; extension != nil {
+				lines = append(lines, "Extension kind: "+extension.Kind, "Update status: "+extension.Status, "Full local version: "+orUnknown(extension.FullVersion), "Launcher: "+orUnknown(extension.Launcher))
+				if extension.Reason != "" {
+					lines = append(lines, extension.Reason)
+				}
+				if extension.BlockedReason != "" {
+					lines = append(lines, "Blocked: "+extension.BlockedReason)
+				}
+				if extension.Pinned {
+					lines = append(lines, "Pinned: no automatic upgrade")
+				}
+			}
 		}
 		if p.Description != "" {
 			lines = append(lines, "", p.Description)
@@ -403,6 +439,9 @@ func (m *Model) rowDetails(r row) string {
 		}
 		if manager.ReasonCode != "" {
 			lines = append(lines, "Detection: "+manager.ReasonCode)
+		}
+		if manager.ID == "gh-ext" {
+			lines = append(lines, "Native command: gh extension", "Manager version describes the gh launcher; package rows describe registered extensions.")
 		}
 		if manager.Reason != "" {
 			lines = append(lines, "Reason: "+manager.Reason)
@@ -461,27 +500,7 @@ func (m *Model) rowDetails(r row) string {
 }
 
 func (m *Model) modalView() string {
-	title, text, footer := "", "", "↑↓ scroll · Esc back"
 	switch m.modal {
-	case detailsModal:
-		title = "Package details"
-		if r, ok := m.selectedRow(); ok {
-			text = m.rowDetails(r)
-		} else {
-			text = "This item is no longer in the visible results. Close this panel and choose a current item."
-		}
-		for _, action := range m.actions() {
-			footer += " · " + action.key + " " + action.label
-		}
-	case helpModal:
-		title = "Keyboard & scope"
-		text = m.helpText()
-	case issuesModal:
-		title = "Errors & coverage"
-		text = m.issuesText()
-	case resultModal:
-		title = "Last operation"
-		text = resultText(m.lastResult, m.lastError)
 	case versionModal:
 		return m.versionView()
 	case setupModal:
@@ -492,34 +511,50 @@ func (m *Model) modalView() string {
 		return m.saveSetView()
 	case resolutionModal, maintenanceModal:
 		return m.workflowView()
-	case promptModal:
-		title = "Prompt preview"
-		text = m.workflow.prompt.Markdown
-		if m.workflow.loading {
-			text = "Collecting current context…"
-		} else if m.workflow.err != nil {
-			text = "Could not prepare prompt: " + m.workflow.err.Error()
-		}
 	case exportPromptModal:
 		return m.exportPromptView()
-	case planModal:
-		title = "Review changes"
-		if m.planLoading {
-			text = "Preparing the exact operation plan…\n\nNo changes have been made."
-			footer = "Esc cancel"
-		} else if m.planErr != nil {
-			text = "Could not prepare this operation.\n\n" + m.planErr.Error()
-			footer = "Esc back; no changes have been made"
-		} else {
-			text = m.planText()
-			footer = "y execute reviewed plan · Esc cancel · ↑↓ scroll"
-		}
-		if m.width < 40 || m.height < 10 {
-			text = "Resize to at least 40×10 to review and approve this plan."
-			footer = "Esc cancel; approval disabled while too small"
-		}
 	}
-	return m.scrollModal(title, text, footer)
+	title, text := m.modalText()
+	return m.scrollModal(title, text, "")
+}
+func (m *Model) modalText() (string, string) {
+	switch m.modal {
+	case batchReviewModal:
+		return "Review package upgrades", m.batchReviewText()
+	case batchResultModal:
+		return "Package upgrade results", batchResultText(m.batch.result, m.batch.history, m.batch.err)
+	case detailsModal:
+		if r, ok := m.selectedRow(); ok {
+			return "Package details", m.rowDetails(r)
+		}
+		return "Package details", "This item is no longer in the visible results. Close this panel and choose a current item."
+	case helpModal:
+		return "Keyboard & scope", m.helpText()
+	case issuesModal:
+		return "Errors & coverage", m.issuesText()
+	case resultModal:
+		return "Last operation", resultText(m.lastResult, m.lastError)
+	case promptModal:
+		if m.workflow.loading {
+			return "Prompt preview", "Collecting current context…"
+		}
+		if m.workflow.err != nil {
+			return "Prompt preview", "Could not prepare prompt: " + m.workflow.err.Error()
+		}
+		return "Prompt preview", m.workflow.prompt.Markdown
+	case planModal:
+		if m.width < 40 || m.height < 10 {
+			return "Review changes", "Resize to at least 40×10 to review and approve this plan."
+		}
+		if m.planLoading {
+			return "Review changes", "Preparing the exact operation plan…\n\nNo changes have been made."
+		}
+		if m.planErr != nil {
+			return "Review changes", "Could not prepare this operation.\n\n" + m.planErr.Error()
+		}
+		return "Review changes", m.planText()
+	}
+	return "", ""
 }
 
 func (m *Model) versionView() string {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/daviddwlee84/lazypkg/internal/domain"
 	"io"
 	"os"
@@ -13,12 +14,33 @@ import (
 )
 
 type fakeService struct {
-	executed       int
-	planned        int
-	queries        []domain.PackageQuery
-	healthChecks   int
-	maintenanceIDs []string
-	saved          []string
+	batchRequest    domain.BatchUpgradeRequest
+	batchExecutions int
+	packageRows     []domain.Package
+	executed        int
+	planned         int
+	queries         []domain.PackageQuery
+	healthChecks    int
+	maintenanceIDs  []string
+	saved           []string
+}
+
+func (f *fakeService) PlanBatchUpgrade(_ context.Context, r domain.BatchUpgradeRequest) (domain.BatchUpgradePlan, error) {
+	f.batchRequest = r
+	p := domain.BatchUpgradePlan{Request: r, Entries: []domain.BatchUpgradeEntry{}, Fingerprint: "fake"}
+	for _, target := range r.Targets {
+		p.Entries = append(p.Entries, domain.BatchUpgradeEntry{Package: target, State: "planned", Plan: &domain.ActionPlan{Kind: "package", Request: domain.ActionRequest{Operation: "upgrade", Manager: target.Manager, Package: target.ID}}})
+	}
+	return p, nil
+}
+func (f *fakeService) ExecuteBatchUpgrade(_ context.Context, p domain.BatchUpgradePlan, _ io.Reader, out, _ io.Writer) (domain.BatchUpgradeResult, error) {
+	f.batchExecutions++
+	fmt.Fprintln(out, "native batch output")
+	r := domain.BatchUpgradeResult{Entries: []domain.BatchUpgradeItemResult{}, Message: "Batch completed"}
+	for _, entry := range p.Entries {
+		r.Entries = append(r.Entries, domain.BatchUpgradeItemResult{Entry: entry, State: "success"})
+	}
+	return r, nil
 }
 
 func (f *fakeService) StreamQuery(ctx context.Context, q domain.PackageQuery) <-chan domain.QueryEvent {
@@ -47,6 +69,9 @@ func (f *fakeService) Managers(context.Context) ([]domain.Manager, error) {
 	return []domain.Manager{}, nil
 }
 func (f *fakeService) Packages(context.Context, string, string, string) (domain.Snapshot, error) {
+	if f.packageRows != nil {
+		return domain.Snapshot{Packages: f.packageRows}, nil
+	}
 	return domain.Snapshot{Packages: []domain.Package{{Manager: "brew", ID: "jq", Version: "1.8"}}, Issues: []domain.Issue{{Manager: "cargo", Message: "unavailable"}}}, nil
 }
 func (f *fakeService) Query(ctx context.Context, q domain.PackageQuery) (domain.Snapshot, error) {

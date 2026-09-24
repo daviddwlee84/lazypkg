@@ -47,6 +47,8 @@ usable width. Manager filters, selection and queries survive view changes.
 | Key | Action |
 |---|---|
 | `↑/↓`, `j/k`, `gg/G` | Select / first / last item |
+| `Ctrl+d/u` | Move half a visible page down/up |
+| `Ctrl+f/b`, `PgDn/PgUp` | Move a full visible page down/up |
 | `←/→`, `h/l`, `1`–`5` | Switch view |
 | `Tab`, `Shift+Tab` | Switch manager/list focus |
 | `f` | Choose managers, built-in groups or saved ordered sets |
@@ -59,16 +61,30 @@ usable width. Manager filters, selection and queries survive view changes.
 | `/` | Filter locally; in Discover, type and Enter to search |
 | `Enter` | Details / accept filter |
 | `i`, `u`, `x` | Review install, upgrade, removal when supported |
+| `Space`, `Ctrl+a` in Installed/Updates | Mark an eligible row / toggle all eligible filtered rows |
+| `u`, `U` in Installed/Updates | Review marked items (otherwise current row) / all filtered rows |
 | `a` | Review global activation of an installed mise version |
 | `d` | Diagnose a selected package's first known command |
 | `s`, `r`, `e`, `?` | Setup, refresh, errors/coverage, help |
 | `Esc`, `q` | Back/cancel, quit |
 
-Typing owns printable keys. A package action first prepares an exact plan;
+Text fields retain their editing shortcuts. A package action first prepares an exact plan;
 `y` executes it and `Esc` cancels. Native prompts run with the TUI terminal
 released, then an acknowledgement returns to the dashboard. Views remain
 usable during reads; failed providers do not erase their previously shown
 installed records.
+
+Package batches include every filtered row, including rows beyond the current
+page. Marks survive `/` filtering; visible and hidden marks are counted, and
+`u` includes both. Each view keeps its own marks; changing the manager/group/set
+scope clears them. `U` freezes the current filtered list. The overview lists
+plans and exclusions, and one approval runs eligible upgrades sequentially.
+It never invokes a manager's upgrade-all operation. A failure, changed target
+or uncertain result pauses the batch; recheck, skip or stop, then review the
+remaining plans again. Completed changes are retained. Native managers select
+the actual release at execution; a displayed version is not a version pin.
+mise groups versions of the same tool into one exact installation and does not
+activate it or remove older versions.
 
 Installed and Updates publish one provider at a time. Basic package records are
 usable before slower providers or ownership enrichment finish; progress and
@@ -109,6 +125,9 @@ lazypkg install ripgrep --manager brew --dry-run
 lazypkg install ripgrep --manager brew --yes
 lazypkg updates --manager brew
 lazypkg upgrade ripgrep --manager brew --dry-run
+lazypkg upgrade-batch --manager brew --from updates --filter python --dry-run
+lazypkg upgrade-batch --target brew:ripgrep --target gh-ext:dlvhdr/gh-dash --dry-run
+lazypkg upgrade-batch --manager brew --from updates --filter python --yes --json
 lazypkg remove ripgrep --manager brew --dry-run
 lazypkg diagnose rg --json
 lazypkg managers --json
@@ -131,7 +150,13 @@ lazypkg completion zsh
 
 Queries accept repeated/comma-separated `--manager`, one `--group`, or one `--set`;
 these selectors are mutually exclusive. Explicit manager and saved-set order is
-preserved. Package mutations require exactly one `--manager`. `--json` keeps
+preserved. Single-package mutations require exactly one `--manager`.
+`upgrade-batch` accepts repeated `--target manager:package-id`, or a manager/group/set
+selection with `--from installed|updates` and optional `--filter`; these two forms
+cannot be combined. Its dry-run includes skipped/current/unsupported targets.
+Batch JSON also includes selection coverage and issues; a failed scan yielding
+no targets returns an error instead of treating the inventory as current.
+`--json` keeps
 stdout free of
 native command logs. Non-interactive mutation requires `--yes`; `--dry-run`
 performs read queries but applies no changes. Native managers may still require
@@ -162,15 +187,16 @@ rather than using mpm's `--purge` behavior; global Scoop removal is not exposed.
 The embedded catalog covers **all 149 adapters in mpm 8.0.1**, including 144
 maintained adapters. Detection probes every adapter supported on the current
 platform, including Go, RubyGems, Cargo and rustup. Detection alone does not
-enable package operations: global/user scope is currently verified for 18
+enable package operations: global/user scope is currently verified for 19
 adapters (Homebrew formulae/casks, apt, DNF, pacman, WinGet, Scoop, Chocolatey,
-npm, uv tools, pipx, Cargo, Go, RubyGems, rustup, mise, Flatpak and Snap).
+npm, uv tools, pipx, Cargo, Go, RubyGems, rustup, mise, Flatpak, Snap and GitHub CLI
+extensions).
 Environment-specific and unknown scopes remain visible but passive, even if
 explicitly selected. A detected manager must also satisfy mpm's minimum version;
 its requirement, incompatibility reason and exact capabilities appear in details.
 
 Built-in groups include `system`, `runtimes`, `python`, `node`, `ruby`, `rust`,
-`go`, `debian`, `rpm`, `arch`, `global`, `environment`, `unknown` and `all`.
+`go`, `extensions`, `debian`, `rpm`, `arch`, `global`, `environment`, `unknown` and `all`.
 Groups describe catalog membership; they do not bypass the scope policy.
 
 - **Global scope:** no project dependency/venv scan or inactive npm-context sweep.
@@ -185,6 +211,15 @@ Groups describe catalog membership; they do not bypass the scope policy.
   metadata in GOBIN/GOPATH. This does not prove they were installed with `go install`.
   The pinned adapter's version probe is corrected to `go version` through mpm's
   configuration override.
+- **GitHub CLI extensions:** the sidebar's `gh ext` is mpm's `gh-ext` provider ID,
+  invoked through `gh extension`, not a standalone `gh-ext` command. Native
+  inventory includes binary, Git and local extensions. Updates checks each
+  verified remote extension using `gh extension upgrade OWNER/REPO --dry-run`.
+  Older gh versions without that flag can still list extensions. Pinned, local,
+  modified or unverified installations show a reason instead of an upgrade.
+  Exact repository, host, installation root and pin state are checked again
+  before mutation; tags and commit hashes are treated as opaque references.
+  A pinned remote extension may still be explicitly removed after review.
 - **Missing managers:** no remote catalog is invented for a manager that is not
   installed. Search coverage and failures remain visible.
 - **Provenance:** recorded ownership, recognized/manageable software, inferred
@@ -206,7 +241,7 @@ independent copies. `R` / `resolve` inspects a focused command, then lets you
 choose a retained installation and review one removal at a time. The plan binds
 both installations, their manager contexts and the expected PATH result.
 
-Assessment covers all 17 enabled global/user providers with removal capability.
+Assessment covers all 18 enabled global/user providers with removal capability.
 Reviewed removal preflights currently support Homebrew formulae, uv tools and
 exact npm global prefixes. Other providers, runtime coexistence, missing source
 evidence and unknown transaction effects produce guidance and a prompt instead

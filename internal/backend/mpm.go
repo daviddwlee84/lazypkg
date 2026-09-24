@@ -42,6 +42,9 @@ func Capabilities(id string) []string {
 	if e.ID == "uvx" {
 		caps = append(caps, "search")
 	}
+	if e.ID == "gh-ext" {
+		caps = append(caps, "outdated") // native per-extension dry-run; feature-gated by the app
+	}
 	return caps
 }
 func Known(id string) bool              { _, ok := catalog.Lookup(id); return ok }

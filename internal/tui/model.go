@@ -26,6 +26,8 @@ const (
 var viewNames = []string{"Installed", "Discover", "Updates", "Diagnostics", "Managers"}
 
 type viewState struct {
+	marks            map[string]domain.Package
+	markOrder        []string
 	snapshot         domain.Snapshot
 	candidates       domain.Snapshot
 	scopeKey         string
@@ -64,6 +66,8 @@ const (
 	maintenanceModal
 	promptModal
 	exportPromptModal
+	batchReviewModal
+	batchResultModal
 )
 
 type setupState struct {
@@ -138,6 +142,7 @@ type Model struct {
 	pendingG           bool
 	quitting           bool
 	workflow           workflowState
+	batch              batchState
 }
 
 type packagesMsg struct {
@@ -310,10 +315,17 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.mouseMessage(message)
 	}
 	switch message.(type) {
-	case tea.WindowSizeMsg, tea.KeyPressMsg, tea.PasteMsg, managersMsg, packagesMsg, diagnosticsMsg, setupMsg, planMsg, executedMsg, preferencesMsg, inventoryMsg, healthMsg, savedSetMsg, streamStartedMsg, streamEventMsg, conflictMsg, maintenanceMsg, promptMsg, promptIOResultMsg:
+	case tea.WindowSizeMsg, tea.KeyPressMsg, tea.PasteMsg, managersMsg, packagesMsg, diagnosticsMsg, setupMsg, planMsg, executedMsg, preferencesMsg, inventoryMsg, healthMsg, savedSetMsg, streamStartedMsg, streamEventMsg, conflictMsg, maintenanceMsg, promptMsg, promptIOResultMsg, batchPlanMsg, batchExecutedMsg, batchRefreshMsg:
 		m.invalidateMouse()
 	}
 	switch msg := message.(type) {
+	case batchRefreshMsg:
+		return m, m.acceptBatchRefresh(msg)
+	case batchPlanMsg:
+		m.acceptBatchPlan(msg)
+		return m, nil
+	case batchExecutedMsg:
+		return m, m.acceptBatchExecuted(msg)
 	case streamStartedMsg:
 		return m, m.acceptStreamStart(msg)
 	case streamEventMsg:
@@ -569,6 +581,10 @@ func (m *Model) inputMessage(message tea.Msg) tea.Cmd {
 
 func (m *Model) navigationKey(key tea.KeyPressMsg) tea.Cmd {
 	name := key.String()
+	if m.pageKey(name) {
+		m.pendingG = false
+		return nil
+	}
 	if name != "g" {
 		m.pendingG = false
 	}
@@ -576,7 +592,29 @@ func (m *Model) navigationKey(key tea.KeyPressMsg) tea.Cmd {
 	case "R":
 		return m.startConflict()
 	case "U":
-		return m.openMaintenance()
+		if packageView(m.view) {
+			return m.startBatchUpgrade("visible")
+		}
+		if m.view == managersView {
+			return m.openMaintenance()
+		}
+		return nil
+	case "u":
+		if packageView(m.view) && !m.managerFocus && len(m.states[m.view].marks) > 0 {
+			return m.startBatchUpgrade("selected")
+		}
+		if m.view == managersView {
+			return m.requestAction("manager-update")
+		}
+		return m.requestAction("upgrade")
+	case "space", " ":
+		if row, ok := m.selectedRow(); ok {
+			m.toggleMark(row.key)
+		}
+		return nil
+	case "ctrl+a":
+		m.toggleVisibleMarks()
+		return nil
 	case "p":
 		return m.openPrompt()
 	case "M":
@@ -610,10 +648,6 @@ func (m *Model) navigationKey(key tea.KeyPressMsg) tea.Cmd {
 		m.move(-1)
 	case "down", "j":
 		m.move(1)
-	case "pgup":
-		m.move(-m.pageSize())
-	case "pgdown":
-		m.move(m.pageSize())
 	case "home":
 		m.move(-1 << 30)
 	case "end", "G":
@@ -762,6 +796,7 @@ func (m *Model) move(delta int) {
 }
 
 func (m *Model) reconcile(view viewID, reset bool) {
+	m.reconcileMarks(view)
 	s := &m.states[view]
 	rows := m.rows(view)
 	if reset {
@@ -809,6 +844,10 @@ func (m *Model) cancelView(view viewID) {
 }
 
 func (m *Model) cancelAll() {
+	if m.batch.cancel != nil {
+		m.batch.cancel()
+	}
+	m.batch.generation++
 	m.cancelWorkflow()
 	for i := range m.states {
 		m.cancelView(viewID(i))
