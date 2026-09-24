@@ -157,7 +157,13 @@ func TestGHInstallApprovalBindsHostRootAndConfiguration(t *testing.T) {
 				t.Fatal(p, err)
 			}
 			warning := strings.Join(p.Warnings, "\n")
-			if !strings.Contains(warning, r.path) || !strings.Contains(warning, "github.com") || !strings.Contains(warning, filepath.Join(os.Getenv("XDG_DATA_HOME"), "gh", "extensions")) {
+			// Windows temporary paths may use an 8.3 spelling while the provider
+			// reports the canonical long path in its reviewed installation root.
+			root, err := filepath.EvalSymlinks(filepath.Join(os.Getenv("XDG_DATA_HOME"), "gh", "extensions"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(warning, r.path) || !strings.Contains(warning, "github.com") || !strings.Contains(warning, root) {
 				t.Fatal("install scope is not reviewable", p)
 			}
 			value := t.TempDir()

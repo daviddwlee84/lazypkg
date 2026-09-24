@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -72,21 +73,38 @@ func findExecutable(t *testing.T, r domain.DiagnosticReport, path string) domain
 	return domain.Executable{}
 }
 
+// Filesystem-backed fixtures must use the host's executable and PATH rules.
+// Setting GOOS to linux cannot give Windows files Unix execute bits or make a
+// Windows drive letter safe inside a colon-separated PATH.
+func nativeExecutable(name string) string {
+	if runtime.GOOS == "windows" {
+		return name + ".exe"
+	}
+	return name
+}
+
+func nativePATH(dirs ...string) string { return strings.Join(dirs, string(os.PathListSeparator)) }
+
+func nativeTestEngine(r process.Runner, path, dir string) *Engine {
+	return &Engine{Runner: r, GOOS: runtime.GOOS, Path: path, PathExt: ".EXE;.CMD;.PS1", Dir: dir}
+}
+
 func TestPATHOwnershipShadowingAndEquivalentLinks(t *testing.T) {
 	dir := t.TempDir()
 	one := filepath.Join(dir, "one")
 	two := filepath.Join(dir, "two")
 	three := filepath.Join(dir, "three")
 	four := filepath.Join(dir, "four")
-	brew := filepath.Join(dir, "cellar", "ripgrep", "1", "bin", "rg")
-	cargo := filepath.Join(two, "rg")
+	command := nativeExecutable("rg")
+	brew := filepath.Join(dir, "cellar", "ripgrep", "1", "bin", command)
+	cargo := filepath.Join(two, command)
 	writeFile(t, brew, "brew", 0755)
 	writeFile(t, cargo, "cargo", 0755)
-	linkFile(t, brew, filepath.Join(one, "rg"))
-	linkFile(t, brew, filepath.Join(three, "rg"))
-	linkFile(t, filepath.Join(dir, "gone"), filepath.Join(four, "rg"))
+	linkFile(t, brew, filepath.Join(one, command))
+	linkFile(t, brew, filepath.Join(three, command))
+	linkFile(t, filepath.Join(dir, "gone"), filepath.Join(four, command))
 	runner := &fakeRunner{}
-	engine := &Engine{Runner: runner, GOOS: "linux", Path: strings.Join([]string{one, two, three, one, four}, ":"), Dir: dir}
+	engine := nativeTestEngine(runner, nativePATH(one, two, three, one, four), dir)
 	packages := []domain.Package{{Manager: "brew", ID: "ripgrep", Root: filepath.Dir(filepath.Dir(brew))}, {Manager: "cargo", ID: "ripgrep", ExecutablePaths: []string{cargo}}}
 	report, err := engine.Diagnose(context.Background(), "rg", packages)
 	if err != nil {
@@ -95,11 +113,11 @@ func TestPATHOwnershipShadowingAndEquivalentLinks(t *testing.T) {
 	if len(report.Executables) != 4 {
 		t.Fatalf("repeated PATH directory should collapse: %#v", report.Executables)
 	}
-	first := findExecutable(t, report, filepath.Join(one, "rg"))
+	first := findExecutable(t, report, filepath.Join(one, command))
 	if !first.Preferred || first.Manager != "brew" {
 		t.Fatalf("incorrect first candidate: %#v", first)
 	}
-	if e := findExecutable(t, report, filepath.Join(three, "rg")); e.EquivalentTo != first.Path {
+	if e := findExecutable(t, report, filepath.Join(three, command)); e.EquivalentTo != first.Path {
 		t.Fatalf("symlink counted twice: %#v", e)
 	}
 	if e := findExecutable(t, report, cargo); e.Manager != "cargo" || e.Preferred {
@@ -121,11 +139,11 @@ func TestSpecificPackageBeatsRuntimeBinScan(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, "mise", "installs", "node", "24")
 	script := filepath.Join(root, "lib", "node_modules", "tool", "cli.js")
-	path := filepath.Join(root, "bin", "tool")
+	path := filepath.Join(root, "bin", nativeExecutable("tool"))
 	writeFile(t, script, "script", 0755)
-	linkFile(t, script, path)
+	writeFile(t, path, "registered entrypoint", 0755)
 	packages := []domain.Package{{Manager: "mise", ID: "node", Root: root, ExecutablePaths: []string{path}}, {Manager: "npm", ID: "tool", Root: filepath.Dir(script), ExecutablePaths: []string{path, script}}}
-	e := Engine{Runner: &fakeRunner{}, Path: filepath.Dir(path), Dir: dir}
+	e := nativeTestEngine(&fakeRunner{}, filepath.Dir(path), dir)
 	r, err := e.Diagnose(context.Background(), "tool", packages)
 	if err != nil {
 		t.Fatal(err)
@@ -138,12 +156,12 @@ func TestSpecificPackageBeatsRuntimeBinScan(t *testing.T) {
 func TestWholeScanDispatchersAreNotExtraInstallations(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, "mise", "installs", "node", "24")
-	path := filepath.Join(root, "bin", "node")
-	shim := filepath.Join(dir, "mise", "shims", "node")
+	path := filepath.Join(root, "bin", nativeExecutable("node"))
+	shim := filepath.Join(dir, "mise", "shims", nativeExecutable("node"))
 	writeFile(t, path, "node", 0755)
 	writeFile(t, shim, "dispatcher", 0755)
 	runner := &fakeRunner{}
-	e := Engine{Runner: runner, Path: filepath.Dir(shim) + ":" + filepath.Dir(path), Dir: dir}
+	e := nativeTestEngine(runner, nativePATH(filepath.Dir(shim), filepath.Dir(path)), dir)
 	r, err := e.Diagnose(context.Background(), "", []domain.Package{{Manager: "mise", ID: "node", Root: root}})
 	if err != nil {
 		t.Fatal(err)
@@ -162,10 +180,10 @@ func TestUnknownRuntimeAndNonExecutable(t *testing.T) {
 	dir := t.TempDir()
 	a := filepath.Join(dir, "a")
 	b := filepath.Join(dir, "b")
-	writeFile(t, filepath.Join(a, "node"), "one", 0755)
-	writeFile(t, filepath.Join(b, "node"), "two", 0755)
+	writeFile(t, filepath.Join(a, nativeExecutable("node")), "one", 0755)
+	writeFile(t, filepath.Join(b, nativeExecutable("node")), "two", 0755)
 	writeFile(t, filepath.Join(a, "note"), "not executable", 0644)
-	e := &Engine{GOOS: "linux", Path: a + ":" + b, Dir: dir}
+	e := nativeTestEngine(nil, nativePATH(a, b), dir)
 	pkgs := []domain.Package{{Manager: "mise", ID: "node", Root: a}, {Manager: "mise", ID: "node", Root: b}}
 	r, err := e.Diagnose(context.Background(), "", pkgs)
 	if err != nil {
@@ -191,6 +209,10 @@ func TestWindowsPATHAndPATHEXTOrder(t *testing.T) {
 	writeFile(t, filepath.Join(b, "tool.EXE"), "exe", 0644)
 	writeFile(t, filepath.Join(b, "tool.CMD"), "cmd", 0644)
 	writeFile(t, filepath.Join(a, "ignored.txt"), "text", 0644)
+	writeFile(t, filepath.Join(a, "outside-pathext.ps1"), "script", 0755)
+	if err := os.Mkdir(filepath.Join(a, "directory.EXE"), 0755); err != nil {
+		t.Fatal(err)
+	}
 	e := &Engine{GOOS: "windows", Path: a + ";" + b, PathExt: ".EXE;.CMD", Dir: dir}
 	r, err := e.Diagnose(context.Background(), "TOOL", nil)
 	if err != nil {
@@ -201,6 +223,32 @@ func TestWindowsPATHAndPATHEXTOrder(t *testing.T) {
 	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("case insensitive names must share a group: %#v", r.Findings)
+	}
+	all, err := e.Diagnose(context.Background(), "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all.Issues) != 0 || len(all.Executables) != 3 {
+		t.Fatalf("Windows scan must preserve drive paths and select PATHEXT files only: %#v", all)
+	}
+}
+
+func TestWindowsEmptyAndRelativePATHComponents(t *testing.T) {
+	dir := t.TempDir()
+	first := filepath.Join(dir, "tool.CMD")
+	second := filepath.Join(dir, "bin", "tool.EXE")
+	writeFile(t, first, "cwd command", 0644)
+	writeFile(t, second, "relative executable", 0644)
+	e := &Engine{GOOS: "windows", Path: ";bin;", PathExt: ".EXE;.CMD", Dir: dir}
+	r, err := e.Diagnose(context.Background(), "TOOL", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Issues) != 0 || len(r.Executables) != 2 {
+		t.Fatalf("Windows relative PATH resolution: %#v", r)
+	}
+	if r.Executables[0].Path != first || !r.Executables[0].Preferred || r.Executables[0].PathIndex != 0 || r.Executables[1].Path != second || r.Executables[1].PathIndex != 1 {
+		t.Fatalf("PATH directory order must precede PATHEXT order: %#v", r.Executables)
 	}
 }
 
@@ -234,7 +282,7 @@ func TestScoopShimIsEquivalentToTargetButArgumentsAreNot(t *testing.T) {
 func TestCancellationAndNameValidation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	e := &Engine{GOOS: "linux", Path: t.TempDir()}
+	e := nativeTestEngine(nil, t.TempDir(), t.TempDir())
 	if _, err := e.Diagnose(ctx, "rg", nil); !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected cancellation, got %v", err)
 	}
@@ -245,9 +293,9 @@ func TestCancellationAndNameValidation(t *testing.T) {
 
 func TestEmptyAndRelativePATHComponentsUseDiagnosticDirectory(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "tool"), "cwd", 0755)
-	writeFile(t, filepath.Join(dir, "bin", "tool"), "relative", 0755)
-	e := &Engine{GOOS: "linux", Path: ":bin:", Dir: dir}
+	writeFile(t, filepath.Join(dir, nativeExecutable("tool")), "cwd", 0755)
+	writeFile(t, filepath.Join(dir, "bin", nativeExecutable("tool")), "relative", 0755)
+	e := nativeTestEngine(nil, nativePATH("", "bin", ""), dir)
 	r, err := e.Diagnose(context.Background(), "tool", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -258,6 +306,9 @@ func TestEmptyAndRelativePATHComponentsUseDiagnosticDirectory(t *testing.T) {
 }
 
 func TestEnrichmentUsesRecordsAndPreservesPartialResults(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Homebrew keg and Unix npm symlink layout; Windows enrichment has separate fixtures")
+	}
 	dir := t.TempDir()
 	cellar := filepath.Join(dir, "cellar")
 	brewBinary := filepath.Join(cellar, "ripgrep", "1.0", "bin", "rg")
@@ -313,6 +364,9 @@ func TestEnrichmentUsesRecordsAndPreservesPartialResults(t *testing.T) {
 }
 
 func TestDpkgUsesExactOwnershipAndKeepsSuccessfulOutput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("dpkg owns POSIX executable paths and is not a native Windows manager")
+	}
 	dir := t.TempDir()
 	binary := filepath.Join(dir, "tool[1]")
 	writeFile(t, binary, "bin", 0755)
@@ -379,19 +433,60 @@ func TestWindowsNPMWrappersAndScoopOwnership(t *testing.T) {
 	}
 }
 
+func TestWindowsEnrichmentUsesRecordsAndPreservesPartialResults(t *testing.T) {
+	dir := t.TempDir()
+	uvRoot := filepath.Join(dir, "uv", "ruff")
+	uvPath := filepath.Join(dir, "local", "bin", "ruff.exe")
+	writeFile(t, uvPath, "binary", 0644)
+	cargoRoot := filepath.Join(dir, "cargo")
+	t.Setenv("CARGO_INSTALL_ROOT", cargoRoot)
+	miseRoot := filepath.Join(dir, "mise", "installs", "node", "22")
+	misePath := filepath.Join(miseRoot, "bin", "node.exe")
+	writeFile(t, misePath, "node", 0644)
+	uvKey := commandKey("uv", "--color", "never", "--no-progress", "tool", "list", "--show-paths")
+	runner := &fakeRunner{output: map[string]string{
+		uvKey: "ruff v1.0 (" + uvRoot + ")\n- ruff (" + uvPath + ")\n",
+		commandKey("cargo", "install", "--list", "--root", cargoRoot): "ripgrep v1.0:\n    rg.exe\n",
+	}}
+	input := []domain.Package{
+		{Manager: "uvx", ID: "ruff"},
+		{Manager: "cargo", ID: "ripgrep"},
+		{Manager: "mise", ID: "node", Root: miseRoot},
+		{Manager: "winget", ID: "Some.App", Evidence: []domain.Evidence{{Kind: "recognized", Source: "winget"}}},
+	}
+	e := &Engine{Runner: runner, GOOS: "windows", Path: dir, PathExt: ".EXE;.CMD", Dir: dir}
+	out, issues := e.Enrich(context.Background(), input)
+	if len(issues) != 0 {
+		t.Fatalf("unexpected enrichment errors: %#v", issues)
+	}
+	for i, path := range []string{uvPath, filepath.Join(cargoRoot, "bin", "rg.exe"), misePath} {
+		if len(out[i].ExecutablePaths) != 1 || out[i].ExecutablePaths[0] != path || len(out[i].Evidence) == 0 {
+			t.Fatalf("missing native Windows entrypoint for %s: %#v", out[i].Manager, out[i])
+		}
+	}
+	if len(input[0].Commands) != 0 || out[3].Evidence[0].Kind != "recognized" {
+		t.Fatal("enrichment changed caller records or strengthened WinGet provenance")
+	}
+	runner.failures = map[string]error{uvKey: errors.New("uv unavailable")}
+	out, issues = e.Enrich(context.Background(), input)
+	if len(issues) != 1 || issues[0].Manager != "uvx" || len(out[1].ExecutablePaths) != 1 || len(out[2].ExecutablePaths) != 1 {
+		t.Fatalf("a failed provider erased independent Windows results: %#v %#v", out, issues)
+	}
+}
+
 func TestKnownEntrypointsOutsidePATHAndMiseShimSelection(t *testing.T) {
 	dir := t.TempDir()
 	shimDir := filepath.Join(dir, "mise", "shims")
 	activeRoot := filepath.Join(dir, "mise", "installs", "node", "22")
 	inactiveRoot := filepath.Join(dir, "mise", "installs", "node", "20")
-	active := filepath.Join(activeRoot, "bin", "node")
-	inactive := filepath.Join(inactiveRoot, "bin", "node")
-	shim := filepath.Join(shimDir, "node")
+	active := filepath.Join(activeRoot, "bin", nativeExecutable("node"))
+	inactive := filepath.Join(inactiveRoot, "bin", nativeExecutable("node"))
+	shim := filepath.Join(shimDir, nativeExecutable("node"))
 	writeFile(t, active, "active", 0755)
 	writeFile(t, inactive, "inactive", 0755)
 	writeFile(t, shim, "mise dispatcher", 0755)
 	runner := &fakeRunner{output: map[string]string{commandKey("mise", "which", "node"): active}}
-	e := &Engine{Runner: runner, GOOS: "linux", Path: shimDir, Dir: dir}
+	e := nativeTestEngine(runner, shimDir, dir)
 	pkgs := []domain.Package{{Manager: "mise", ID: "node", Version: "22", Root: activeRoot, Commands: []string{"node"}, ExecutablePaths: []string{active}, Active: true}, {Manager: "mise", ID: "node", Version: "20", Root: inactiveRoot, Commands: []string{"node"}, ExecutablePaths: []string{inactive}}}
 	r, err := e.Diagnose(context.Background(), "node", pkgs)
 	if err != nil {
@@ -416,13 +511,13 @@ func TestKnownEntrypointsOutsidePATHAndMiseShimSelection(t *testing.T) {
 
 func TestOffPATHExecutableIsNeverPreferred(t *testing.T) {
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "installed", "tool")
+	bin := filepath.Join(dir, "installed", nativeExecutable("tool"))
 	empty := filepath.Join(dir, "empty")
 	if err := os.Mkdir(empty, 0755); err != nil {
 		t.Fatal(err)
 	}
 	writeFile(t, bin, "binary", 0755)
-	e := &Engine{GOOS: "linux", Path: empty, Dir: dir}
+	e := nativeTestEngine(nil, empty, dir)
 	r, err := e.Diagnose(context.Background(), "tool", []domain.Package{{Manager: "uvx", ID: "tool", Commands: []string{"tool"}, ExecutablePaths: []string{bin}}})
 	if err != nil {
 		t.Fatal(err)
@@ -435,13 +530,13 @@ func TestOffPATHExecutableIsNeverPreferred(t *testing.T) {
 func TestMiseSharedDispatcherRootDoesNotClaimCargoTools(t *testing.T) {
 	dir := t.TempDir()
 	shared := filepath.Join(dir, "cargo", "bin")
-	binary := filepath.Join(shared, "rg")
+	binary := filepath.Join(shared, nativeExecutable("rg"))
 	writeFile(t, binary, "cargo binary", 0755)
 	root := filepath.Join(dir, "mise", "installs", "rust", "stable")
 	linkFile(t, shared, root)
 	dotnet := filepath.Join(dir, "mise", "installs", "dotnet", "10")
-	writeFile(t, filepath.Join(dotnet, "dotnet"), "dotnet", 0755)
-	e := &Engine{GOOS: "linux", Path: shared, Dir: dir}
+	writeFile(t, filepath.Join(dotnet, nativeExecutable("dotnet")), "dotnet", 0755)
+	e := nativeTestEngine(nil, shared, dir)
 	pkgs, issues := e.Enrich(context.Background(), []domain.Package{{Manager: "mise", ID: "rust", Root: root}, {Manager: "mise", ID: "dotnet", Root: dotnet}})
 	if len(issues) != 0 || len(pkgs[0].ExecutablePaths) != 0 || len(pkgs[1].ExecutablePaths) != 1 {
 		t.Fatalf("incorrect runtime root scan: %#v %#v", pkgs, issues)
