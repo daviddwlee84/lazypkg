@@ -6,6 +6,7 @@ on:
         required: false
         type: string
   push:
+    branches: ["**"]
   pull_request:
 permissions:
   contents: read

@@ -115,7 +115,9 @@ func Prepare(ctx context.Context, executable, binaryName string, opts Options) (
 	if err != nil {
 		return plan, err
 	}
-	plan = Plan{Formula: owner.formula(), BrewPath: brewPath, Cellar: filepath.Dir(owner.rack), CurrentPath: resolved}
+	// Preserve the selected invocation path: Linuxbrew derives its prefix from
+	// $0 before resolving its own symlink. Bind the real target separately.
+	plan = Plan{Formula: owner.formula(), BrewPath: brewLookup, Cellar: filepath.Dir(owner.rack), CurrentPath: resolved}
 	prefix, err := proveManager(ctx, opts, plan, owner.rack)
 	if err != nil {
 		return plan, err
@@ -309,7 +311,7 @@ func (s *binding) validate() error {
 		return errors.New("running executable or Homebrew receipt changed since planning")
 	}
 	path, err = canonical(s.brewLookup)
-	if err != nil || path != s.view.BrewPath || s.manager.validate() != nil {
+	if err != nil || path != s.manager.path || s.manager.validate() != nil {
 		return errors.New("selected Homebrew executable changed since planning")
 	}
 	path, err = canonical(s.view.StablePath)

@@ -336,3 +336,35 @@ func tree(t *testing.T, root string) []string {
 	}
 	return paths
 }
+
+func TestSymlinkedManagerRetainsInvocationPathAndBindsRealTarget(t *testing.T) {
+	f := newFixture(t)
+	real := filepath.Join(f.root, "manager checkout", "bin", "brew")
+	if err := os.MkdirAll(filepath.Dir(real), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(f.brew, real); err != nil {
+		t.Fatal(err)
+	}
+	f.link(real, f.brew)
+	// The fixture runner requires the logical path, modeling Homebrew's $0.
+	plan := f.plan()
+	if plan.BrewPath != f.brew || plan.Command()[0] != f.brew {
+		t.Fatalf("lost invocation path: %+v", plan)
+	}
+	if _, err := plan.Apply(context.Background(), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if f.upgrades != 1 {
+		t.Fatal("upgrade was not delegated")
+	}
+	replacement := filepath.Join(f.root, "replacement-brew")
+	f.write(replacement, "different manager")
+	f.link(replacement, f.brew)
+	if _, err := plan.Apply(context.Background(), io.Discard); err == nil {
+		t.Fatal("retargeted manager accepted")
+	}
+	if f.upgrades != 1 {
+		t.Fatal("changed manager was invoked")
+	}
+}

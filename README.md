@@ -5,7 +5,7 @@ installed, choose an installation source, and understand which executable PATH
 will find. Go provides the CLI/TUI; [Meta Package Manager](https://mpm.run/)
 provides most package operations.
 
-The current version is **v0.1.3**, targeting macOS, Windows and Linux.
+The current version is **v0.1.4**, targeting macOS, Windows and Linux.
 Native macOS read-only checks, an isolated uv tool lifecycle and an isolated
 mise/npm manager repair are part of local verification. Windows/Linux native
 installer and terminal
@@ -19,7 +19,7 @@ lazypkg --version
 lazypkg self upgrade --check
 ```
 
-**v0.1.3** adds macOS/Linux amd64/arm64 binary releases and the personal Homebrew
+**v0.1.4** adds macOS/Linux amd64/arm64 binary releases and the personal Homebrew
 formula. Go is optional for binary installs; runtime backends remain separate.
 See [installation, completion and owner-aware upgrades](docs/distribution.md).
 [MIT license](LICENSE).
@@ -29,7 +29,7 @@ See [installation, completion and owner-aware upgrades](docs/distribution.md).
 Requires **Go 1.26 or newer**. Install the tagged source version:
 
 ```sh
-go install github.com/daviddwlee84/lazypkg/cmd/lazypkg@v0.1.3
+go install github.com/daviddwlee84/lazypkg/cmd/lazypkg@v0.1.4
 lazypkg --version
 ```
 
@@ -459,6 +459,6 @@ CI checks the generated artifact against the pinned environment.
 Rebuild this checkout to update a development binary. An application self-updater
 is available as `lazypkg self upgrade` for its verified Homebrew owner; use
 `--check` to inspect first. Other owners use the external update paths above. Local checkout builds report
-`v0.1.3-dev`; tagged Go installations report their module version.
+`v0.1.4-dev`; tagged Go installations report their module version.
 
 See [architecture](docs/architecture.md) and [verification](docs/verification.md).

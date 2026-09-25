@@ -1,6 +1,6 @@
 # Installation and upgrades
 
-Version **v0.1.3** provides macOS and Linux binaries for amd64 and arm64. Go is
+Version **v0.1.4** provides macOS and Linux binaries for amd64 and arm64. Go is
 needed only for source builds. Other operating systems are not part of this
 binary release. Runtime integrations remain separate from installing this CLI.
 
@@ -35,14 +35,14 @@ assume an unrelated PATH copy is the installed executable being updated.
 Source installation remains available:
 
 ```sh
-go install github.com/daviddwlee84/lazypkg/cmd/lazypkg@v0.1.3
+go install github.com/daviddwlee84/lazypkg/cmd/lazypkg@v0.1.4
 # Update an existing Go installation through its original destination:
 go install github.com/daviddwlee84/lazypkg/cmd/lazypkg@latest
 ```
 
 `go install` uses `GOBIN` or `GOPATH/bin`; inspect `go env GOBIN GOPATH` if it is
 not on PATH. A moved executable does not follow a later Go install automatically.
-Source tags recover their module version; release archives inject v0.1.3; local
+Source tags recover their module version; release archives inject v0.1.4; local
 checkout builds retain a development identity. `@latest` selects a suitable
 version tag, not necessarily the newest main-branch commit.
 
