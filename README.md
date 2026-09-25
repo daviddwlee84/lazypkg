@@ -459,6 +459,6 @@ CI checks the generated artifact against the pinned environment.
 Rebuild this checkout to update a development binary. An application self-updater
 is available as `lazypkg self upgrade` for its verified Homebrew owner; use
 `--check` to inspect first. Other owners use the external update paths above. Local checkout builds report
-`v0.1.2-dev`; tagged Go installations report their module version.
+`v0.1.3-dev`; tagged Go installations report their module version.
 
 See [architecture](docs/architecture.md) and [verification](docs/verification.md).
