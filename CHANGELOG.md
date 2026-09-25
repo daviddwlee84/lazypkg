@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+
+## v0.1.3 - 2026-09-25
+
+- Publish macOS/Linux amd64/arm64 binary archives, checksums and a filtered source archive.
+- Add the personal Homebrew formula channel with generated Bash/Zsh completions.
+- Provide `lazypkg self upgrade` and read-only `--check` through verified Homebrew ownership; preserve standalone/local copies and document their external update paths.
+- Verify source/module packaging independently; retain embedded resources and development history outside release payloads.
+- Distribute the application under MIT.
+
 ## v0.1.2 — 2026-09-25
 
 - Reconcile Homebrew tap identities across inventory, Updates, Discover and

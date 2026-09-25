@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/daviddwlee84/lazypkg/internal/managedupgrade"
 	"io"
 	"os"
 	"runtime/debug"
@@ -24,7 +25,7 @@ import (
 
 var Version = "dev"
 
-const BaseVersion = "v0.1.2"
+const BaseVersion = "v0.1.3"
 
 func version() string {
 	if Version != "" && Version != "dev" {
@@ -114,6 +115,9 @@ func NewRoot() *cobra.Command { return newRoot(nil) }
 func newRoot(service domain.Service) *cobra.Command {
 	o := &options{override: service}
 	root := &cobra.Command{Use: "lazypkg", Short: "See, search and manage software across package managers", Version: version(), SilenceErrors: true, SilenceUsage: true, Args: cobra.NoArgs}
+	self := &cobra.Command{Use: "self", Short: "Manage the lazypkg executable", Args: cobra.NoArgs}
+	self.AddCommand(managedupgrade.NewCommand(managedupgrade.Product{Binary: "lazypkg", Module: "github.com/daviddwlee84/lazypkg", Main: "github.com/daviddwlee84/lazypkg/cmd/lazypkg"}))
+	root.AddCommand(self)
 	root.AddCommand(resolutionCommand(o), promptCommand(o))
 	root.AddCommand(batchUpgradeCommand(o))
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usageError{err} })

@@ -1,0 +1,32 @@
+version: 2
+project_name: lazypkg
+before:
+  hooks:
+    - python3 scripts/release.py completions --project lazypkg --binary lazypkg --main ./cmd/lazypkg
+builds:
+  - id: lazypkg
+    main: ./cmd/lazypkg
+    binary: lazypkg
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags: [-buildvcs=true]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X github.com/daviddwlee84/lazypkg/internal/cli.Version=v{{ .Version }}
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    builds_info:
+      mtime: "{{ .CommitDate }}"
+    files:
+      - src: LICENSE
+      - src: completions/*
+checksum:
+  name_template: checksums.txt
+release:
+  draft: true
+source:
+  enabled: true
+  name_template: "{{ .ProjectName }}_{{ .Version }}_source"
+  format: tar.gz

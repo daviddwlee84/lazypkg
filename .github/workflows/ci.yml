@@ -1,5 +1,10 @@
 name: CI
 on:
+  workflow_call:
+    inputs:
+      ref:
+        required: false
+        type: string
   push:
   pull_request:
 permissions:
@@ -9,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -24,6 +31,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -34,3 +43,31 @@ jobs:
       - run: go run ./cmd/lazypkg --help
       - if: runner.os != 'Windows'
         run: python3 scripts/pty_smoke.py
+
+  release-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Publisher and independent source/module boundary tests
+        run: python3 -m unittest discover -s scripts -p 'test_*release*.py'
+      - run: python3 -m unittest discover -s scripts -p test_distribution.py
+      - run: python3 scripts/check-distribution.py
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: v2.18.2
+          args: check
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: v2.18.2
+          args: release --snapshot --clean --skip=publish,announce
+      - name: Verify complete snapshot archives and native executable
+        run: python3 scripts/release.py check --project lazypkg --binary lazypkg --smoke

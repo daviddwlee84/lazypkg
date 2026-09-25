@@ -1,0 +1,16 @@
+{
+  "main": "./cmd/lazypkg",
+  "version_symbol": "github.com/daviddwlee84/lazypkg/internal/cli.Version",
+  "required": [
+    "cmd/lazypkg/main.go",
+    "internal/catalog/catalog.go"
+  ],
+  "smoke": [
+    [
+      "self",
+      "upgrade",
+      "--check",
+      "--json"
+    ]
+  ]
+}

@@ -75,3 +75,8 @@ go.work.sum
 /bin/
 /lazypkg
 /lazypkg.exe
+
+# Release artifacts
+/dist/
+/completions/
+__pycache__/

@@ -99,9 +99,15 @@ Windows and Linux. It uses mpm 8.0.1 subprocess JSON as its main package backend
   Package marks persist across text filters but clear when manager scope changes.
 - Tagged source installations use `go install
   github.com/daviddwlee84/lazypkg/cmd/lazypkg@VERSION`; repeating it with `@latest`
-  updates Go-installed copies. There are no prebuilt assets or verified package
-  recipes yet. Do not claim a cross-build proves native Windows/Linux terminal
+  updates Go-installed copies. Binary releases target macOS/Linux; the personal tap installs their verified
+  archives. `self upgrade` manages this executable separately from package upgrades. Do not claim a cross-build proves native Windows/Linux terminal
   or package-manager behavior. Checkout versions use BaseVersion + `-dev`;
   tagged installations obtain their version from Go build metadata.
 
 Keep this file grounded in the repository as implementation changes.
+
+## Binary distribution
+
+See `docs/distribution.md`. Run GoReleaser config/snapshot checks and
+`scripts/check-distribution.py` before tagging. Preserve immutable releases and
+source/module exclusions. Backend setup is separate from installing this CLI.
