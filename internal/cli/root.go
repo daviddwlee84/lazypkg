@@ -199,8 +199,16 @@ func newRoot(service domain.Service) *cobra.Command {
 				return writeJSON(cmd.OutOrStdout(), v)
 			}
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 4, 2, ' ', 0)
-			fmt.Fprintln(w, "PACKAGE\tINSTALLED\tAVAILABLE\tMANAGER\tSCOPE")
+			if q.kind == "outdated" {
+				fmt.Fprintln(w, "PACKAGE\tINSTALLED\tAVAILABLE\tTYPE\tMANAGER\tSCOPE")
+			} else {
+				fmt.Fprintln(w, "PACKAGE\tINSTALLED\tAVAILABLE\tMANAGER\tSCOPE")
+			}
 			for _, p := range v.Packages {
+				if q.kind == "outdated" {
+					fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", clean(p.ID), clean(installedLabel(p)), clean(p.Latest), orDash(string(p.UpdateKind())), p.Manager, clean(p.Scope))
+					continue
+				}
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", clean(p.ID), clean(installedLabel(p)), clean(p.Latest), p.Manager, clean(p.Scope))
 			}
 			w.Flush()

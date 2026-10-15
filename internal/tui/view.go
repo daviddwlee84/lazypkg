@@ -3,12 +3,14 @@ package tui
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/daviddwlee84/lazypkg/internal/domain"
 	"github.com/daviddwlee84/lazypkg/internal/process"
 )
 
@@ -231,11 +233,33 @@ func (m *Model) packagePane(width, height int) string {
 		} else if m.view == managersView {
 			heading = "Provider"
 		}
-		lines = append(lines, muted.Render(fmt.Sprintf("%s · %d", heading, len(rows))))
+		summary := fmt.Sprintf("%s · %d", heading, len(rows))
+		if m.view == updatesView {
+			summary += updateKindSummary(rows)
+		}
+		lines = append(lines, muted.Render(summary))
 		count := max(1, height-5)
 		start := clamp(s.offset, 0, max(0, len(rows)-count))
-		for i := start; i < min(start+count, len(rows)); i++ {
-			r := rows[i]
+		visible := rows[start:min(start+count, len(rows))]
+		available := max(1, width-4)
+		markerWidth := 2
+		if packageView(m.view) {
+			markerWidth = 4
+		}
+		secondaries := m.secondaryColumn(visible, 0)
+		badgeWidth := 0
+		for _, r := range visible {
+			badgeWidth = max(badgeWidth, len(updateBadge(r.kind)))
+		}
+		if badgeWidth > 0 {
+			badgeWidth++
+		}
+		labelWidth, rightWidth := columnWidths(visible, secondaries, available-markerWidth-badgeWidth)
+		if natural := slices.Max(append([]int{0}, widths(secondaries)...)); rightWidth < natural {
+			secondaries = m.secondaryColumn(visible, rightWidth)
+		}
+		for i, r := range visible {
+			selected := r.key == s.selected && !m.managerFocus
 			marker := "  "
 			if r.key == s.selected {
 				marker = "> "
@@ -249,20 +273,21 @@ func (m *Model) packagePane(width, height int) string {
 				}
 				marker += check
 			}
-			secondary := r.secondary
-			if r.manager != "" && m.view != managersView {
-				secondary = providerLabel(r.manager) + " · " + secondary
-			}
-			available := max(1, width-4)
 			var value string
 			if available >= 38 {
-				right := min(25, available/2)
-				value = marker + line(clean(r.label), available-right-1-ansi.StringWidth(marker)) + " " + line(clean(secondary), right)
+				value = line(marker, markerWidth) + line(clean(r.label), labelWidth) + " " + line(secondaries[i], rightWidth)
+				if badgeWidth > 0 {
+					badge := line(updateBadge(r.kind), badgeWidth-1)
+					if !selected {
+						badge = updateBadgeStyle(r.kind).Render(badge)
+					}
+					value += " " + badge
+				}
 			} else {
 				value = marker + clean(r.label)
 			}
 			value = line(value, width-2)
-			if r.key == s.selected && !m.managerFocus {
+			if selected {
 				value = selectedStyle.Render(value)
 			}
 			lines = append(lines, value)
@@ -364,6 +389,9 @@ func (m *Model) rowDetails(r row) string {
 			latest = "not reported by provider"
 		}
 		lines = append(lines, "", "Provider: "+providerLabel(p.Manager), "Installed: "+installationLabel(p), "Available version: "+latest, "Scope: "+orUnknown(p.Scope))
+		if kind := p.UpdateKind(); m.view == updatesView && kind != domain.UpdateUnknown {
+			lines = append(lines, "Update type: "+string(kind))
+		}
 		if !p.InventoryAt.IsZero() {
 			lines = append(lines, "Inventory observed: "+observed(p.InventoryAt))
 		}
@@ -831,4 +859,100 @@ func fitScreen(s string, width, height int) string {
 		lines = append(lines, strings.Repeat(" ", max(1, width)))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// secondaryColumn formats the right-hand column for the visible rows, padding
+// provider and installed-version parts so update arrows line up. A positive
+// budget shares the remaining width between installed and latest versions.
+func (m *Model) secondaryColumn(rows []row, budget int) []string {
+	out := make([]string, len(rows))
+	providerWidth, installedWidth, latestWidth := 0, 0, 0
+	withProvider := m.view != managersView
+	for _, r := range rows {
+		if withProvider && r.manager != "" {
+			providerWidth = max(providerWidth, ansi.StringWidth(providerLabel(r.manager)))
+		}
+		if m.view == updatesView {
+			installed, latest, _ := strings.Cut(clean(r.secondary), " → ")
+			installedWidth = max(installedWidth, ansi.StringWidth(installed))
+			latestWidth = max(latestWidth, ansi.StringWidth(latest))
+		}
+	}
+	if versions := budget - providerWidth - 6; budget > 0 && installedWidth+latestWidth > versions {
+		installedWidth = max(1, min(installedWidth, max(versions/2, versions-latestWidth)))
+	}
+	for i, r := range rows {
+		secondary := clean(r.secondary)
+		if m.view == updatesView {
+			if installed, latest, ok := strings.Cut(secondary, " → "); ok {
+				secondary = line(installed, installedWidth) + " → " + latest
+			}
+		}
+		if withProvider && r.manager != "" {
+			secondary = line(providerLabel(r.manager), providerWidth) + " · " + secondary
+		}
+		out[i] = secondary
+	}
+	return out
+}
+
+// columnWidths gives the right column its full content width when it fits and
+// otherwise keeps a readable label before truncating the right column.
+func columnWidths(rows []row, secondaries []string, available int) (int, int) {
+	labelNeed, rightNeed := 1, 1
+	for i, r := range rows {
+		labelNeed = max(labelNeed, ansi.StringWidth(clean(r.label)))
+		rightNeed = max(rightNeed, ansi.StringWidth(secondaries[i]))
+	}
+	right := rightNeed
+	if labelNeed+1+rightNeed > available {
+		right = max(1, available-1-min(labelNeed, max(available/3, 16)))
+	}
+	return max(1, available-1-right), right
+}
+
+func updateBadge(kind domain.UpdateKind) string {
+	switch kind {
+	case domain.UpdateMajor:
+		return "MAJOR"
+	case domain.UpdateMinor:
+		return "minor"
+	case domain.UpdatePatch:
+		return "patch"
+	case domain.UpdateRevision:
+		return "rev"
+	}
+	return ""
+}
+
+func updateBadgeStyle(kind domain.UpdateKind) lipgloss.Style {
+	switch kind {
+	case domain.UpdateMajor:
+		return warningStyle.Bold(true)
+	case domain.UpdateMinor:
+		return accent
+	}
+	return muted
+}
+
+func updateKindSummary(rows []row) string {
+	counts := map[domain.UpdateKind]int{}
+	for _, r := range rows {
+		counts[r.kind]++
+	}
+	var out string
+	for _, kind := range []domain.UpdateKind{domain.UpdateMajor, domain.UpdateMinor, domain.UpdatePatch, domain.UpdateRevision} {
+		if counts[kind] > 0 {
+			out += fmt.Sprintf(" · %d %s", counts[kind], kind)
+		}
+	}
+	return out
+}
+
+func widths(values []string) []int {
+	out := make([]int, len(values))
+	for i, v := range values {
+		out[i] = ansi.StringWidth(v)
+	}
+	return out
 }

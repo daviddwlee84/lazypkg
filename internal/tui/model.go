@@ -916,6 +916,7 @@ type row struct {
 	managerInfo *domain.Manager
 	finding     *domain.Finding
 	executable  *domain.Executable
+	kind        domain.UpdateKind
 }
 
 func (m *Model) rows(view viewID) []row {
@@ -981,7 +982,11 @@ func (m *Model) rows(view viewID) []row {
 			if s.retainedManagers[p.Manager] || p.InventoryStale {
 				version += " (stale)"
 			}
-			rows = append(rows, row{key: p.Key(), label: p.ID, secondary: version, manager: p.Manager, pkg: p})
+			r := row{key: p.Key(), label: p.ID, secondary: version, manager: p.Manager, pkg: p}
+			if view == updatesView {
+				r.kind = p.UpdateKind()
+			}
+			rows = append(rows, r)
 		}
 	}
 	query := strings.ToLower(strings.TrimSpace(s.query))
@@ -995,7 +1000,7 @@ func (m *Model) rows(view viewID) []row {
 		if query == "" || view == discoverView {
 			return false
 		}
-		haystack := strings.Join([]string{r.label, r.secondary, r.manager}, " ")
+		haystack := strings.Join([]string{r.label, r.secondary, r.manager, string(r.kind)}, " ")
 		if r.pkg != nil {
 			haystack += " " + r.pkg.Name + " " + r.pkg.Description + " " + strings.Join(r.pkg.Commands, " ")
 		}

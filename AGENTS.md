@@ -64,6 +64,9 @@ Windows and Linux. It uses mpm 8.0.1 subprocess JSON as its main package backend
   render `!`, marks render `✓`, and ordinary rows leave the marker blank. Unknown
   metadata is checked during planning. Keep marker/hint/mouse eligibility shared;
   removal has separate restrictions. Preserve executed batch results across drafts.
+- `domain.ClassifyUpdate` labels updates major/minor/patch/revision from version
+  text (0.x minor is major; calendar/unparseable is unclassified). It is display
+  and filter only and never gates or selects upgrades.
 - Homebrew package IDs are canonicalized before base publication and joins using
   native metadata and receipts. Installed aliases never establish catalog identity.
   Never match taps by basename. Plans retain logical canonical IDs and bind the

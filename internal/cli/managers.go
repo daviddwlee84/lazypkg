@@ -278,3 +278,10 @@ func setCommands(o *options) *cobra.Command {
 	cmd.AddCommand(save)
 	return cmd
 }
+
+func orDash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
+}

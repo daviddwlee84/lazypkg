@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Classify available updates as major/minor/patch/revision (0.x minor counts as major; calendar and unparseable versions stay unclassified) in the Updates view, details pane, `/` filter and `lazypkg updates` TYPE column. Display-only; it never gates upgrades.
+- Size package-list columns from visible content so long versions are no longer truncated on wide terminals, and align update arrows.
 
 ## v0.1.4 - 2026-09-25
 
