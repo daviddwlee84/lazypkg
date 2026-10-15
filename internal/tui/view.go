@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	accent        = lipgloss.NewStyle().Foreground(lipgloss.Color("#7AC7E3")).Bold(true)
-	muted         = lipgloss.NewStyle().Foreground(lipgloss.Color("#8B96A6"))
-	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#E7F4FA")).Background(lipgloss.Color("#263D4B"))
-	warningStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#E8B86D"))
+	accent             = lipgloss.NewStyle().Foreground(lipgloss.Color("#7AC7E3")).Bold(true)
+	muted              = lipgloss.NewStyle().Foreground(lipgloss.Color("#8B96A6"))
+	selectedBackground = lipgloss.Color("#263D4B")
+	selectedStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#E7F4FA")).Background(selectedBackground)
+	warningStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("#E8B86D"))
 )
 
 func (m *Model) View() tea.View {
@@ -236,6 +237,7 @@ func (m *Model) packagePane(width, height int) string {
 		summary := fmt.Sprintf("%s · %d", heading, len(rows))
 		if m.view == updatesView {
 			summary += updateKindSummary(rows)
+			summary += fmt.Sprintf(" · o sort: %s · t type: %s", updateSorts[s.sortMode], updateFilters[s.kindFilter])
 		}
 		lines = append(lines, muted.Render(summary))
 		count := max(1, height-5)
@@ -248,11 +250,8 @@ func (m *Model) packagePane(width, height int) string {
 		}
 		secondaries := m.secondaryColumn(visible, 0)
 		badgeWidth := 0
-		for _, r := range visible {
-			badgeWidth = max(badgeWidth, len(updateBadge(r.kind)))
-		}
-		if badgeWidth > 0 {
-			badgeWidth++
+		if m.view == updatesView {
+			badgeWidth = len(" 0.x ") + len("CALVER")
 		}
 		labelWidth, rightWidth := columnWidths(visible, secondaries, available-markerWidth-badgeWidth)
 		if natural := slices.Max(append([]int{0}, widths(secondaries)...)); rightWidth < natural {
@@ -276,19 +275,27 @@ func (m *Model) packagePane(width, height int) string {
 			var value string
 			if available >= 38 {
 				value = line(marker, markerWidth) + line(clean(r.label), labelWidth) + " " + line(secondaries[i], rightWidth)
-				if badgeWidth > 0 {
-					badge := line(updateBadge(r.kind), badgeWidth-1)
-					if !selected {
-						badge = updateBadgeStyle(r.kind).Render(badge)
-					}
-					value += " " + badge
-				}
 			} else {
 				value = marker + clean(r.label)
 			}
-			value = line(value, width-2)
-			if selected {
-				value = selectedStyle.Render(value)
+			if badgeWidth > 0 && available >= 38 {
+				// Badges keep their colours on the selected row; only the background changes.
+				plain, styled := lipgloss.NewStyle(), func(st lipgloss.Style) lipgloss.Style { return st }
+				if selected {
+					plain = selectedStyle
+					styled = func(st lipgloss.Style) lipgloss.Style { return st.Background(selectedBackground) }
+				}
+				unstable := "   "
+				if r.update.Unstable {
+					unstable = "0.x"
+				}
+				value = plain.Render(value+" ") + styled(warningStyle).Render(unstable) + plain.Render(" ") + styled(updateBadgeStyle(r.update.Kind)).Render(line(updateBadge(r.update.Kind), len("CALVER")))
+				value += plain.Render(strings.Repeat(" ", max(0, width-2-ansi.StringWidth(value))))
+			} else {
+				value = line(value, width-2)
+				if selected {
+					value = selectedStyle.Render(value)
+				}
 			}
 			lines = append(lines, value)
 		}
@@ -389,8 +396,11 @@ func (m *Model) rowDetails(r row) string {
 			latest = "not reported by provider"
 		}
 		lines = append(lines, "", "Provider: "+providerLabel(p.Manager), "Installed: "+installationLabel(p), "Available version: "+latest, "Scope: "+orUnknown(p.Scope))
-		if kind := p.UpdateKind(); m.view == updatesView && kind != domain.UpdateUnknown {
-			lines = append(lines, "Update type: "+string(kind))
+		if class := p.UpdateClass(); m.view == updatesView && class.Kind != domain.UpdateUnknown {
+			lines = append(lines, "Version change: "+string(class.Kind))
+			if class.Unstable {
+				lines = append(lines, "0.x release: no stability guarantee; this does not confirm a breaking change.")
+			}
 		}
 		if !p.InventoryAt.IsZero() {
 			lines = append(lines, "Inventory observed: "+observed(p.InventoryAt))
@@ -913,16 +923,12 @@ func columnWidths(rows []row, secondaries []string, available int) (int, int) {
 
 func updateBadge(kind domain.UpdateKind) string {
 	switch kind {
-	case domain.UpdateMajor:
-		return "MAJOR"
-	case domain.UpdateMinor:
-		return "minor"
-	case domain.UpdatePatch:
-		return "patch"
+	case domain.UpdatePrerelease:
+		return "PRE"
 	case domain.UpdateRevision:
-		return "rev"
+		return "REV"
 	}
-	return ""
+	return strings.ToUpper(string(kind))
 }
 
 func updateBadgeStyle(kind domain.UpdateKind) lipgloss.Style {
@@ -937,14 +943,21 @@ func updateBadgeStyle(kind domain.UpdateKind) lipgloss.Style {
 
 func updateKindSummary(rows []row) string {
 	counts := map[domain.UpdateKind]int{}
+	unstable := 0
 	for _, r := range rows {
-		counts[r.kind]++
+		counts[r.update.Kind]++
+		if r.update.Unstable {
+			unstable++
+		}
 	}
 	var out string
-	for _, kind := range []domain.UpdateKind{domain.UpdateMajor, domain.UpdateMinor, domain.UpdatePatch, domain.UpdateRevision} {
-		if counts[kind] > 0 {
+	for _, kind := range updateKindOrder {
+		if counts[kind] > 0 && kind != domain.UpdateUnknown {
 			out += fmt.Sprintf(" · %d %s", counts[kind], kind)
 		}
+	}
+	if unstable > 0 {
+		out += fmt.Sprintf(" · %d 0.x", unstable)
 	}
 	return out
 }

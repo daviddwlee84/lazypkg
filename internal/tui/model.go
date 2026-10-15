@@ -49,6 +49,8 @@ type viewState struct {
 	providers        map[string]providerState
 	retainedManagers map[string]bool
 	err              error
+	sortMode         int // index into updateSorts (Updates only)
+	kindFilter       int // index into updateFilters (Updates only)
 }
 
 type modalKind int
@@ -628,6 +630,19 @@ func (m *Model) navigationKey(key tea.KeyPressMsg) tea.Cmd {
 	case "ctrl+a":
 		m.toggleVisibleMarks()
 		return nil
+	case "o", "t":
+		if m.view != updatesView {
+			return nil
+		}
+		s := &m.states[updatesView]
+		if name == "o" {
+			s.sortMode = (s.sortMode + 1) % len(updateSorts)
+		} else {
+			s.kindFilter = (s.kindFilter + 1) % len(updateFilters)
+		}
+		m.reconcile(updatesView, false)
+		m.status = fmt.Sprintf("Sort: %s · type: %s (o/t cycle)", updateSorts[s.sortMode], updateFilters[s.kindFilter])
+		return nil
 	case "p":
 		return m.openPrompt()
 	case "M":
@@ -916,7 +931,7 @@ type row struct {
 	managerInfo *domain.Manager
 	finding     *domain.Finding
 	executable  *domain.Executable
-	kind        domain.UpdateKind
+	update      domain.UpdateClass
 }
 
 func (m *Model) rows(view viewID) []row {
@@ -984,12 +999,16 @@ func (m *Model) rows(view viewID) []row {
 			}
 			r := row{key: p.Key(), label: p.ID, secondary: version, manager: p.Manager, pkg: p}
 			if view == updatesView {
-				r.kind = p.UpdateKind()
+				r.update = p.UpdateClass()
 			}
 			rows = append(rows, r)
 		}
 	}
 	query := strings.ToLower(strings.TrimSpace(s.query))
+	if view == updatesView {
+		rows = slices.DeleteFunc(rows, func(r row) bool { return !updateFilterMatches(updateFilters[s.kindFilter], r.update) })
+		sortUpdateRows(rows, updateSorts[s.sortMode])
+	}
 	return slices.DeleteFunc(rows, func(r row) bool {
 		if len(m.effectiveManagers()) > 0 && view != managersView && view != diagnosticsView && !m.includesManager(r.manager) {
 			// Findings concern several providers; retain them when their paths cannot be attributed.
@@ -1000,7 +1019,10 @@ func (m *Model) rows(view viewID) []row {
 		if query == "" || view == discoverView {
 			return false
 		}
-		haystack := strings.Join([]string{r.label, r.secondary, r.manager, string(r.kind)}, " ")
+		haystack := strings.Join([]string{r.label, r.secondary, r.manager, string(r.update.Kind)}, " ")
+		if r.update.Unstable {
+			haystack += " 0.x"
+		}
 		if r.pkg != nil {
 			haystack += " " + r.pkg.Name + " " + r.pkg.Description + " " + strings.Join(r.pkg.Commands, " ")
 		}

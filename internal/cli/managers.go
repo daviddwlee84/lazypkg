@@ -279,9 +279,13 @@ func setCommands(o *options) *cobra.Command {
 	return cmd
 }
 
-func orDash(s string) string {
-	if s == "" {
+func updateType(p domain.Package) string {
+	class := p.UpdateClass()
+	if class.Kind == domain.UpdateUnknown {
 		return "-"
 	}
-	return s
+	if class.Unstable {
+		return string(class.Kind) + " (0.x)"
+	}
+	return string(class.Kind)
 }

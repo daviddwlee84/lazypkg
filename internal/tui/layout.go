@@ -214,6 +214,9 @@ func (m *Model) footerButtons() ([]uiButton, []uiButton) {
 	extra := []uiButton{}
 	if packageView(m.view) && !m.managerFocus {
 		extra = append(extra, uiButton{" ", "Space select"}, uiButton{"ctrl+a", "^A all"}, uiButton{"U", "U filtered"})
+		if m.view == updatesView {
+			extra = append(extra, uiButton{"o", "o sort"}, uiButton{"t", "t type"})
+		}
 	}
 	if m.view == managersView {
 		extra = append(extra, uiButton{"U", "U maintain"}, uiButton{"p", "p prompt"})

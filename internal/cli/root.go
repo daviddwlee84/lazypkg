@@ -206,7 +206,7 @@ func newRoot(service domain.Service) *cobra.Command {
 			}
 			for _, p := range v.Packages {
 				if q.kind == "outdated" {
-					fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", clean(p.ID), clean(installedLabel(p)), clean(p.Latest), orDash(string(p.UpdateKind())), p.Manager, clean(p.Scope))
+					fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", clean(p.ID), clean(installedLabel(p)), clean(p.Latest), updateType(p), p.Manager, clean(p.Scope))
 					continue
 				}
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", clean(p.ID), clean(installedLabel(p)), clean(p.Latest), p.Manager, clean(p.Scope))

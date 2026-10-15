@@ -6,17 +6,27 @@ import (
 	"strings"
 )
 
-// UpdateKind describes how far an available version is from the installed one.
-// It is derived from version text for display only and never gates an upgrade.
+// UpdateKind names which part of the version text changed. It describes the
+// version position only, not compatibility, and never gates an upgrade.
 type UpdateKind string
 
 const (
-	UpdateMajor    UpdateKind = "major"
-	UpdateMinor    UpdateKind = "minor"
-	UpdatePatch    UpdateKind = "patch"
-	UpdateRevision UpdateKind = "revision" // same upstream version, rebuilt (brew _N, cask build)
-	UpdateUnknown  UpdateKind = ""
+	UpdateMajor      UpdateKind = "major"
+	UpdateMinor      UpdateKind = "minor"
+	UpdatePatch      UpdateKind = "patch"
+	UpdatePrerelease UpdateKind = "prerelease"
+	UpdateRevision   UpdateKind = "revision" // same upstream version, rebuilt (brew _N, cask build)
+	UpdateCalendar   UpdateKind = "calver"
+	UpdateUnknown    UpdateKind = ""
 )
+
+// UpdateClass separates the changed version position from compatibility
+// hints. Unstable marks a 0.x installed version: such releases make no
+// stability promise, which does not prove this update breaks anything.
+type UpdateClass struct {
+	Kind     UpdateKind `json:"kind,omitempty"`
+	Unstable bool       `json:"unstable,omitempty"`
+}
 
 var dateVersion = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}`)
 
@@ -58,43 +68,49 @@ func parseVersion(text string) (parsedVersion, bool) {
 	return v, true
 }
 
-// ClassifyUpdate reports the semantic distance from installed to latest.
-// Calendar, unparseable or non-increasing versions are UpdateUnknown. For 0.x
-// versions a minor change is treated as major and a patch change as minor,
-// following semantic versioning's initial-development rule.
-func ClassifyUpdate(installed, latest string) UpdateKind {
+// ClassifyUpdate reports which version position changed from installed to
+// latest. Unparseable or non-increasing versions are UpdateUnknown; versions
+// that look calendar-based are UpdateCalendar.
+func ClassifyUpdate(installed, latest string) UpdateClass {
 	a, okA := parseVersion(installed)
 	b, okB := parseVersion(latest)
-	if !okA || !okB || a.calendar || b.calendar {
-		return UpdateUnknown
+	if !okA || !okB {
+		return UpdateClass{}
 	}
+	if a.calendar || b.calendar {
+		if installed == latest {
+			return UpdateClass{}
+		}
+		return UpdateClass{Kind: UpdateCalendar}
+	}
+	class := UpdateClass{Unstable: a.numbers[0] == 0}
 	for i := range max(len(a.numbers), len(b.numbers)) {
 		x, y := segment(a.numbers, i), segment(b.numbers, i)
 		if x == y {
 			continue
 		}
 		if y < x {
-			return UpdateUnknown
-		}
-		if a.numbers[0] == 0 && i > 0 {
-			i--
+			return UpdateClass{}
 		}
 		switch i {
 		case 0:
-			return UpdateMajor
+			class.Kind = UpdateMajor
 		case 1:
-			return UpdateMinor
+			class.Kind = UpdateMinor
 		default:
-			return UpdatePatch
+			class.Kind = UpdatePatch
 		}
+		return class
 	}
-	if a.pre != b.pre {
-		return UpdatePatch
+	switch {
+	case a.pre != b.pre:
+		class.Kind = UpdatePrerelease
+	case a.revision != b.revision:
+		class.Kind = UpdateRevision
+	default:
+		return UpdateClass{}
 	}
-	if a.revision != b.revision {
-		return UpdateRevision
-	}
-	return UpdateUnknown
+	return class
 }
 
 func segment(numbers []int, i int) int {
@@ -104,5 +120,5 @@ func segment(numbers []int, i int) int {
 	return 0
 }
 
-// UpdateKind classifies the package's installed version against its latest.
-func (p Package) UpdateKind() UpdateKind { return ClassifyUpdate(p.Version, p.Latest) }
+// UpdateClass classifies the package's installed version against its latest.
+func (p Package) UpdateClass() UpdateClass { return ClassifyUpdate(p.Version, p.Latest) }
