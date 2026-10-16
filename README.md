@@ -5,7 +5,7 @@ installed, choose an installation source, and understand which executable PATH
 will find. Go provides the CLI/TUI; [Meta Package Manager](https://mpm.run/)
 provides most package operations.
 
-The current version is **v0.1.4**, targeting macOS, Windows and Linux.
+The current version is **v0.2.0**, targeting macOS, Windows and Linux.
 Native macOS read-only checks, an isolated uv tool lifecycle and an isolated
 mise/npm manager repair are part of local verification. Windows/Linux native
 installer and terminal
@@ -19,8 +19,11 @@ lazypkg --version
 lazypkg self upgrade --check
 ```
 
-**v0.1.4** adds macOS/Linux amd64/arm64 binary releases and the personal Homebrew
-formula. Go is optional for binary installs; runtime backends remain separate.
+**v0.2.0** labels each available update by the changed version position
+(MAJOR/MINOR/PATCH/PRE/REV/CALVER, plus a separate `0.x` marker), adds Updates sort
+and type filters, and stops truncating long versions on wide terminals. Since
+v0.1.3, macOS/Linux amd64/arm64 binary releases and the personal Homebrew
+formula are available. Go is optional for binary installs; runtime backends remain separate.
 See [installation, completion and owner-aware upgrades](docs/distribution.md).
 [MIT license](LICENSE).
 
@@ -29,7 +32,7 @@ See [installation, completion and owner-aware upgrades](docs/distribution.md).
 Requires **Go 1.26 or newer**. Install the tagged source version:
 
 ```sh
-go install github.com/daviddwlee84/lazypkg/cmd/lazypkg@v0.1.4
+go install github.com/daviddwlee84/lazypkg/cmd/lazypkg@v0.2.0
 lazypkg --version
 ```
 
@@ -101,6 +104,7 @@ usable width. Manager filters, selection and queries survive view changes.
 | `i`, `u`, `x` | Review install, upgrade, removal when supported |
 | `Space`, `Ctrl+a` in Installed/Updates | Select a row / toggle all selectable filtered rows |
 | `u`, `U` in Installed/Updates | Review marked items (otherwise current row) / all filtered rows |
+| `o`, `t` in Updates | Cycle sort (name/type/provider) / type filter (all/major/minor/patch/0.x/other) |
 | `a` | Review global activation of an installed mise version |
 | `d` | Diagnose a selected package's first known command |
 | `s`, `r`, `e`, `?` | Setup, refresh, errors/coverage, help |
@@ -459,6 +463,6 @@ CI checks the generated artifact against the pinned environment.
 Rebuild this checkout to update a development binary. An application self-updater
 is available as `lazypkg self upgrade` for its verified Homebrew owner; use
 `--check` to inspect first. Other owners use the external update paths above. Local checkout builds report
-`v0.1.4-dev`; tagged Go installations report their module version.
+`v0.2.0-dev`; tagged Go installations report their module version.
 
 See [architecture](docs/architecture.md) and [verification](docs/verification.md).
