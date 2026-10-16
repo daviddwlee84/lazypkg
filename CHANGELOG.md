@@ -3,6 +3,10 @@
 ## Unreleased
 
 
+## v0.2.1 - 2026-10-16
+
+- Publish the v0.2.0 changes. The v0.2.0 tag has no release: its Go module would have included a committed agent plan, so `.claude/plans` now has the same nested `go.mod` boundary as `.specstory`.
+
 ## v0.2.0 - 2026-10-16
 
 - Label available updates by the changed version position (MAJOR/MINOR/PATCH/PRE/REV/CALVER) with a separate `0.x` stability marker, in the Updates view, details pane, `/` filter and `lazypkg updates` TYPE column. Display-only; it never gates upgrades.

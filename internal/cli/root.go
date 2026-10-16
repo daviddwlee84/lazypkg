@@ -25,7 +25,7 @@ import (
 
 var Version = "dev"
 
-const BaseVersion = "v0.2.0"
+const BaseVersion = "v0.2.1"
 
 func version() string {
 	if Version != "" && Version != "dev" {
