@@ -3762,3 +3762,1043 @@ _**Agent (claude-opus-5-5 2026-10-15 14:55:54Z)**_
 - `--json` 還沒有輸出分類欄位。
 
 分支還沒 push，也還沒開 PR。
+
+---
+
+_**User (2026-10-16 02:59:45Z)**_
+
+可以直接發佈新minor version push到main吧
+
+---
+
+_**Agent (claude-opus-5-5 2026-10-16 02:59:50Z)**_
+
+Checking the release process first.
+
+_**Agent (claude-opus-5-5 2026-10-16 02:59:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read release docs and script usage
+
+`sed -n 1,80p docs/distribution.md; python3 scripts/release.py --help 2>&1 | head -30; git tag --sort=-v:refname | head -3; grep -rn "BaseVersion" --include=*.go . 2>/dev/null | head -3 || grep -rn BaseVersion internal cmd | head`
+
+````text
+# Installation and upgrades
+
+Version **v0.1.4** provides macOS and Linux binaries for amd64 and arm64. Go is
+needed only for source builds. Other operating systems are not part of this
+binary release. Runtime integrations remain separate from installing this CLI.
+
+```sh
+brew install daviddwlee84/tap/lazypkg
+lazypkg --version
+lazypkg self upgrade --check
+lazypkg self upgrade --yes
+```
+
+The personal tap consumes complete verified GitHub Releases; a new tag can
+precede formula publication. Homebrew owns its installed version and completion
+files. Check mode inspects the running executable, receipt, formula and owning
+Brew without upgrading or querying GitHub. Apply delegates only that formula,
+then verifies the effective installed product/version. A current or pinned
+formula can be unchanged. Failure may have partial manager effects; no rollback
+or switch of installer is promised. Noninteractive/JSON apply requires `--yes`.
+
+For standalone installs, download the matching `lazypkg_VERSION_OS_ARCH.tar.gz`
+from [GitHub Releases](https://github.com/daviddwlee84/lazypkg/releases), verify its
+exact entry in `checksums.txt`, and put the executable on PATH. Bash and Zsh
+completion files are included under `completions/`; Homebrew installs them,
+while manual archive users can place them in their shell's completion directory.
+
+This release intentionally keeps standalone binary updates external: chezmoi's
+`installPersonalTools` registry uses verified binaries on Linux and the personal
+tap on macOS. `just upgrade-personal` preserves that installed owner, validates
+candidates and refreshes completions. The in-program manager adapter does not
+replace a standalone/local build. Never overwrite a Homebrew keg manually or
+assume an unrelated PATH copy is the installed executable being updated.
+
+Source installation remains available:
+
+```sh
+go install github.com/daviddwlee84/lazypkg/cmd/lazypkg@v0.1.4
+# Update an existing Go installation through its original destination:
+go install github.com/daviddwlee84/lazypkg/cmd/lazypkg@latest
+```
+
+`go install` uses `GOBIN` or `GOPATH/bin`; inspect `go env GOBIN GOPATH` if it is
+not on PATH. A moved executable does not follow a later Go install automatically.
+Source tags recover their module version; release archives inject v0.1.4; local
+checkout builds retain a development identity. `@latest` selects a suitable
+version tag, not necessarily the newest main-branch commit.
+
+## Release contract
+
+The tag workflow runs the native test suites and packaging checks before
+publishing a complete draft. Each immutable release contains four binary
+archives, one rootless source archive and `checksums.txt`. Archives contain only
+the binary, MIT license and generated Bash/Zsh completions. Source archives
+retain build inputs, tests, embedded assets and documentation, while excluding
+development evidence. Go module ZIPs independently exclude evidence through
+nested `go.mod` boundaries; neither mechanism rewrites existing Git history.
+
+```sh
+goreleaser check
+goreleaser release --snapshot --clean --skip=publish,announce
+python3 scripts/release.py check --project lazypkg --binary lazypkg --smoke
+python3 scripts/check-distribution.py
+```
+
+The publisher rejects incomplete sets, checksum/architecture/member mismatches,
+and attempts to replace a published asset. Publish a new version for corrections.
+The Homebrew tap is the single formula writer. Release automation does not need
+a cross-repository token. Native Linux/macOS CI and macOS local verification are
+reported separately; cross-builds alone do not prove terminal/backend behavior.
+usage: release.py [-h] --project PROJECT --binary BINARY [--main MAIN]
+                  [--dist DIST] [--tag TAG] [--repo REPO] [--smoke]
+                  {completions,check,publish}
+
+Build completions, verify release payloads, and publish a complete draft.
+
+positional arguments:
+  {completions,check,publish}
+
+options:
+  -h, --help            show this help message and exit
+  --project PROJECT
+  --binary BINARY
+  --main MAIN
+  --dist DIST
+  --tag TAG
+  --repo REPO
+  --smoke
+v0.1.4
+v0.1.3
+v0.1.2
+(eval):1: no matches found: --include=*.go
+````
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 02:59:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect previous release commit and version references
+
+`git show v0.1.4 --stat | head -30; grep -rn "BaseVersion" internal cmd | head -3; grep -rn "0\.1\.4" --exclude-dir=.specstory --exclude-dir=.git . | grep -v "^./CHANGELOG" | head -20`
+
+```text
+tag v0.1.4
+Tagger: Da-Wei Lee <daviddwlee84@gmail.com>
+Date:   Fri Sep 25 13:06:39 2026 +0800
+
+Release v0.1.4: preserve verified Homebrew invocation across symlinks
+
+commit 703d1d0c74fff2b3fe068829a642eae8805fd816
+Author: Da-Wei Lee <daviddwlee84@gmail.com>
+Date:   Fri Sep 25 13:03:52 2026 +0800
+
+    fix: preserve the Homebrew invocation path across symlinks
+
+ .github/workflows/ci.yml                 |  1 +
+ CHANGELOG.md                             |  5 +++++
+ README.md                                |  8 ++++----
+ docs/distribution.md                     |  6 +++---
+ internal/brewupgrade/brewupgrade.go      |  6 ++++--
+ internal/brewupgrade/brewupgrade_test.go | 32 ++++++++++++++++++++++++++++++++
+ internal/cli/root.go                     |  2 +-
+ pitfalls/brew-symlink-prefix.md          | 19 +++++++++++++++++++
+ 8 files changed, 69 insertions(+), 10 deletions(-)
+internal/cli/root.go:28:const BaseVersion = "v0.1.4"
+internal/cli/root.go:37:	return BaseVersion + "-dev"
+go.mod:17:	github.com/atotto/clipboard v0.1.4 // indirect
+go.sum:7:github.com/atotto/clipboard v0.1.4 h1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z4=
+go.sum:8:github.com/atotto/clipboard v0.1.4/go.mod h1:ZY9tmq7sm5xIbd9bOK4onWV4S6X0u6GY7Vn0Yu86PYI=
+CHANGELOG.md:9:## v0.1.4 - 2026-09-25
+README.md:8:The current version is **v0.1.4**, targeting macOS, Windows and Linux.
+README.md:22:**v0.1.4** adds macOS/Linux amd64/arm64 binary releases and the personal Homebrew
+README.md:32:go install github.com/daviddwlee84/lazypkg/cmd/lazypkg@v0.1.4
+README.md:462:`v0.1.4-dev`; tagged Go installations report their module version.
+internal/cli/root.go:28:const BaseVersion = "v0.1.4"
+docs/distribution.md:3:Version **v0.1.4** provides macOS and Linux binaries for amd64 and arm64. Go is
+docs/distribution.md:38:go install github.com/daviddwlee84/lazypkg/cmd/lazypkg@v0.1.4
+docs/distribution.md:45:Source tags recover their module version; release archives inject v0.1.4; local
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 02:59:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check release workflow and version references
+
+`sed -n 1,25p .github/workflows/release.yml; sed -n 18,30p README.md; sed -n 455,465p README.md; grep -n "version\|0\.1" scripts/check-distribution.py | head -15; cat scripts/distribution.json`
+
+````text
+name: Release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing immutable stable tag to publish or verify
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ inputs.tag || github.ref }}
+  release:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+lazypkg --version
+lazypkg self upgrade --check
+```
+
+**v0.1.4** adds macOS/Linux amd64/arm64 binary releases and the personal Homebrew
+formula. Go is optional for binary installs; runtime backends remain separate.
+See [installation, completion and owner-aware upgrades](docs/distribution.md).
+[MIT license](LICENSE).
+
+## Install or upgrade
+
+Requires **Go 1.26 or newer**. Install the tagged source version:
+
+scope policy and add contract/native verification. Unknown scope is passive
+until reviewed; manually editing generated JSON is not the maintenance path.
+CI checks the generated artifact against the pinned environment.
+
+Rebuild this checkout to update a development binary. An application self-updater
+is available as `lazypkg self upgrade` for its verified Homebrew owner; use
+`--check` to inspect first. Other owners use the external update paths above. Local checkout builds report
+`v0.1.4-dev`; tagged Go installations report their module version.
+
+See [architecture](docs/architecture.md) and [verification](docs/verification.md).
+33: if len(os.Args) != 7 { return fmt.Errorf("expected repo ref module version zip destination") }
+84:def check_module(path, module, version, required):
+85:    prefix = module + "@" + version + "/"
+94:def build_and_smoke(source, target, config, version):
+101:            "-X " + config["version_symbol"] + "=" + version, "-o", str(target), config["main"]]
+118:    result = subprocess.check_output([str(target), "--version"], text=True, timeout=30, env=runtime_env)
+119:    if version not in result:
+120:        raise ValueError("distribution build did not report injected version")
+127:def verify(root, ref, version, config, baseline=None):
+145:        build_and_smoke(source, directory / ("source-binary" + suffix), config, version)
+163:        # A synthetic stable version checks ZIP structure without requiring a tag.
+164:        zip_version = "v0.0.0"
+166:        run([str(helper_binary), str(clone), oid, module, zip_version, str(module_zip), str(module_source)])
+167:        result["module_zip"] = check_module(module_zip, module, zip_version, required)
+168:        build_and_smoke(module_source, directory / ("module-binary" + suffix), config, version)
+{
+  "main": "./cmd/lazypkg",
+  "version_symbol": "github.com/daviddwlee84/lazypkg/internal/cli.Version",
+  "required": [
+    "cmd/lazypkg/main.go",
+    "internal/catalog/catalog.go"
+  ],
+  "smoke": [
+    [
+      "self",
+      "upgrade",
+      "--check",
+      "--json"
+    ]
+  ]
+}
+````
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:00:01Z)**_
+
+Release pattern: bump `BaseVersion` + README/docs/CHANGELOG, annotated tag, and the tag push triggers the release workflow. Bumping to **v0.2.0**.
+
+_**Agent (claude-opus-5-5 2026-10-16 03:00:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find README sections about Updates keys
+
+`grep -n "Ctrl+A\|U filtered\|Updates" README.md | head -15`
+
+```text
+81:Five views: **Installed**, **Discover**, **Updates**, **Diagnostics**, **Managers**.
+102:| `Space`, `Ctrl+a` in Installed/Updates | Select a row / toggle all selectable filtered rows |
+103:| `u`, `U` in Installed/Updates | Review marked items (otherwise current row) / all filtered rows |
+132:fresh planning must verify the target before any write is offered. Ctrl+A can
+136:Installed and Updates publish one provider at a time. Basic package records are
+139:first Installed base result, Updates loads once in the background. Browsing reuses
+143:invalidates observations and refreshes the active view and Updates.
+232:If a newer mise version is already installed, Updates offers activation of that
+264:  inventory names with tap-qualified Updates IDs. Custom taps retain their full
+276:  inventory includes binary, Git and local extensions. Updates checks each
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:00:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Bump version to v0.2.0 across docs and code
+
+```bash
+python3 - <<'EOF'
+def edit(p, old, new, count=1):
+    s=open(p).read(); assert s.count(old)>=1, (p, old); open(p,'w').write(s.replace(old,new,count))
+edit('internal/cli/root.go','const BaseVersion = "v0.1.4"','const BaseVersion = "v0.2.0"')
+edit('README.md','The current version is **v0.1.4**','The current version is **v0.2.0**')
+edit('README.md','''**v0.1.4** adds macOS/Linux amd64/arm64 binary releases and the personal Homebrew
+formula.''','''**v0.2.0** labels each available update by the changed version position
+(MAJOR/MINOR/PATCH/PRE/REV/CALVER, plus a separate `0.x` marker), adds Updates sort
+and type filters, and stops truncating long versions on wide terminals. Since
+v0.1.3, macOS/Linux amd64/arm64 binary releases and the personal Homebrew
+formula are available.''')
+edit('README.md','lazypkg@v0.1.4','lazypkg@v0.2.0')
+edit('README.md','`v0.1.4-dev`','`v0.2.0-dev`')
+edit('README.md','''| `u`, `U` in Installed/Updates | Review marked items (otherwise current row) / all filtered rows |''','''| `u`, `U` in Installed/Updates | Review marked items (otherwise current row) / all filtered rows |
+| `o`, `t` in Updates | Cycle sort (name/type/provider) / type filter (all/major/minor/patch/0.x/other) |''')
+edit('docs/distribution.md','Version **v0.1.4**','Version **v0.2.0**')
+edit('docs/distribution.md','lazypkg@v0.1.4','lazypkg@v0.2.0')
+edit('docs/distribution.md','inject v0.1.4','inject v0.2.0')
+edit('CHANGELOG.md','## Unreleased\n\n','## Unreleased\n\n\n## v0.2.0 - 2026-10-16\n\n')
+EOF
+sed -n 1,12p CHANGELOG.md; grep -rn "0\.1\.4" README.md docs internal cmd | head
+```
+
+```text
+# Changelog
+
+## Unreleased
+
+
+## v0.2.0 - 2026-10-16
+
+- Label available updates by the changed version position (MAJOR/MINOR/PATCH/PRE/REV/CALVER) with a separate `0.x` stability marker, in the Updates view, details pane, `/` filter and `lazypkg updates` TYPE column. Display-only; it never gates upgrades.
+- Updates: `o` cycles sort (name/type/provider) and `t` cycles a type filter (all/major/minor/patch/0.x/other); selection and marks are retained.
+- Size package-list columns from visible content so long versions are no longer truncated on wide terminals, and align update arrows.
+
+## v0.1.4 - 2026-09-25
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:00:12Z)**_
+
+Running tests plus the local release checks before tagging:
+
+_**Agent (claude-opus-5-5 2026-10-16 03:00:28Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Run tests, release script tests, goreleaser check
+
+`go vet ./... && go test ./... 2>&1 | grep -v "^ok\|no test files"; python3 -m unittest scripts/test_release.py scripts/test_distribution.py 2>&1 | tail -3; which goreleaser && goreleaser check 2>&1 | tail -2; go run ./cmd/lazypkg --version`
+
+```text
+Ran 5 tests in 2.961s
+
+FAILED (errors=1)
+/opt/homebrew/bin/goreleaser
+  • 1 configuration file(s) validated
+  • thanks for using GoReleaser!
+lazypkg version v0.2.0-dev
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:00:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect script test error and compare against baseline
+
+`python3 -m unittest scripts/test_release.py scripts/test_distribution.py 2>&1 | grep -B5 -A15 "^ERROR" | head -40; git stash -q && python3 -m unittest scripts/test_release.py scripts/test_distribution.py 2>&1 | tail -2; git stash pop -q && git status --short | head`
+
+```text
+E....
+======================================================================
+ERROR: test_release (unittest.loader._FailedTest.test_release)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_release
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/loader.py", line 141, in loadTestsFromName
+    module = __import__(module_name)
+  File "/Users/zhouhanru/Documents/David/Program/lazypkg/scripts/test_release.py", line 12, in <module>
+    import release
+ModuleNotFoundError: No module named 'release'
+
+
+----------------------------------------------------------------------
+Ran 5 tests in 2.927s
+
+FAILED (errors=1)
+
+FAILED (errors=1)
+ M .specstory/history/2026-10-15_14-17-45Z-image-hash-2-pasted.md
+ M CHANGELOG.md
+ M README.md
+ M docs/distribution.md
+ M internal/cli/root.go
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:00:38Z)**_
+
+That failure is just an import path problem: it's the same without my changes. Running the tests the way CI does:
+
+_**Agent (claude-opus-5-5 2026-10-16 03:00:42Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Run script tests as CI does
+
+`grep -n "test_release\|test_distribution\|unittest" .github/workflows/ci.yml; python3 -m unittest discover -s scripts -p 'test_*.py' 2>&1 | tail -2`
+
+```text
+62:        run: python3 -m unittest discover -s scripts -p 'test_*release*.py'
+63:      - run: python3 -m unittest discover -s scripts -p test_distribution.py
+
+OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:00:45Z)**_
+
+Also running the snapshot packaging check locally, since a published release asset can't be replaced:
+
+_**Agent (claude-opus-5-5 2026-10-16 03:01:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Build snapshot release and verify payloads
+
+`grep -n "dist" .gitignore; goreleaser release --snapshot --clean --skip=publish,announce 2>&1 | tail -3 && python3 scripts/release.py check --project lazypkg --binary lazypkg --smoke 2>&1 | tail -5`
+
+```text
+80:/dist/
+    │ # charm.land/lipgloss/v2
+    │ compile: writing output: write $WORK/b271/_pkg_.a: no space left on device
+    target=linux_amd64_v1
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'dist/checksums.txt'
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:01:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check free disk space and cache sizes
+
+`df -h / /private/tmp 2>&1 | tail -2; du -sh "$(go env GOCACHE)" 2>/dev/null; du -sh /Users/zhouhanru/Documents/David/Program/lazypkg/dist 2>/dev/null`
+
+```text
+/dev/disk3s1s1   460Gi    13Gi   449Mi    97%    484k  4.6M   10%   /
+/dev/disk3s5     460Gi   418Gi   449Mi   100%    6.3M  4.6M   58%   /System/Volumes/Data
+801M	/Users/zhouhanru/Library/Caches/go-build
+ 11M	/Users/zhouhanru/Documents/David/Program/lazypkg/dist
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:01:16Z)**_
+
+<think><details><summary>Thought Process</summary>
+The local build failed due to a full disk (only 449 MB free), but this isn't a code issue—CI runs the same checks before publishing, so I'll skip the local build. I'll clean up the partial `dist/` folder, then commit, merge to main, tag, and push.
+
+</details></think>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:01:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit release, fast-forward main, tag and push
+
+```bash
+rm -rf dist && git add CHANGELOG.md README.md docs/distribution.md internal/cli/root.go && git commit -q -m "chore: release v0.2.0 with update classification, sort and filter
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" && git switch -q main && git merge --ff-only -q feat/update-kind-columns && git tag -a v0.2.0 -m "Release v0.2.0: classify update version changes, add Updates sort/filter and content-sized columns" && git log --oneline -4 && git push origin main v0.2.0 2>&1 | tail -4
+```
+
+```text
+Exit code 1
+error: Your local changes to the following files would be overwritten by checkout:
+	.specstory/history/2026-10-15_14-17-45Z-image-hash-2-pasted.md
+Please commit your changes or stash them before you switch branches.
+Aborting
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:01:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check how specstory file became tracked
+
+`git log --oneline -3 -- .specstory/history/2026-10-15_14-17-45Z-image-hash-2-pasted.md; git log --oneline -4; git branch --show-current`
+
+```text
+6ca7167 chore: backup chat history
+57f4caf chore: release v0.2.0 with update classification, sort and filter
+6ca7167 chore: backup chat history
+04cf2da feat: separate version position from 0.x stability and add update sort/filter
+da60cdb feat: classify update kinds and size package columns from content
+feat/update-kind-columns
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:01:27Z)**_
+
+<think><details><summary>Thought Process</summary>
+Found that the "backup chat history" commit (6ca7167) is your own regular commit, and since `.specstory` is actively being written to during our conversation, switching branches would interfere. I'll fast-forward `main` directly to this branch's HEAD without checking it out.
+
+</details></think>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:01:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Tag release and push main and tag
+
+`git fetch -q origin && git merge-base --is-ancestor origin/main HEAD && echo "ff ok" && git tag -a v0.2.0 -m "Release v0.2.0: classify update version changes, add Updates sort/filter and content-sized columns" && git branch -f main HEAD && git push origin main v0.2.0 2>&1 | tail -4`
+
+```text
+ff ok
+To https://github.com/daviddwlee84/lazypkg.git
+   703d1d0..57f4caf  main -> main
+ * [new tag]         v0.2.0 -> v0.2.0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:01:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check triggered GitHub Actions runs
+
+`sleep 20; gh run list --limit 3 2>&1`
+
+```text
+in_progress		chore: release v0.2.0 with update classification, sort and filter	Release	v0.2.0	push	38843424038	21s	2026-10-16T03:01:35Z
+in_progress		chore: release v0.2.0 with update classification, sort and filter	CI	main	push	38843423744	21s	2026-10-16T03:01:35Z
+completed	success	fix: preserve the Homebrew invocation path across symlinks	Release	v0.1.4	push	36097189469	3m46s	2026-09-25T05:06:47Z
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:01:59Z)**_
+
+Pushed to main and the v0.2.0 tag is up. The Release and CI workflows are running (the last release took about 4 minutes), so I'm waiting for them to finish.
+
+_**Agent (claude-opus-5-5 2026-10-16 03:05:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Wait for release workflow and inspect release
+
+`gh run watch 38843424038 --exit-status --interval 20 > /dev/null 2>&1; echo "release exit $?"; gh run list --limit 2; gh release view v0.2.0 --json isDraft,assets --jq '{draft: .isDraft, assets: [.assets[].name]}' 2>&1`
+
+```text
+Exit code 1
+release exit 1
+completed	failure	chore: release v0.2.0 with update classification, sort and filter	Release	v0.2.0	push	38843424038	3m11s	2026-10-16T03:01:35Z
+completed	failure	chore: release v0.2.0 with update classification, sort and filter	CI	main	push	38843423744	2m21s	2026-10-16T03:01:35Z
+release not found
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:05:15Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read failed CI logs
+
+`gh run view 38843423744 --log-failed 2>&1 | grep -v "^\s*$" | grep -iE "fail|error|---|panic|want|got" | head -40`
+
+```text
+release-contract	Run python3 scripts/check-distribution.py	2026-10-16T03:02:12.9910709Z     raise ValueError("distribution contains conversation or agent plan evidence")
+release-contract	Run python3 scripts/check-distribution.py	2026-10-16T03:02:12.9911779Z ValueError: distribution contains conversation or agent plan evidence
+release-contract	Run python3 scripts/check-distribution.py	2026-10-16T03:02:12.9994333Z ##[error]Process completed with exit code 1.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:05:19Z)**_
+
+<think><details><summary>Thought Process</summary>
+The release was rejected because it contains conversation or agent-plan evidence, so nothing got published. I'll identify which file triggered this.
+
+</details></think>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:05:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect evidence check and tracked plan files
+
+`grep -n "evidence" -B12 scripts/check-distribution.py | head -50; cat .gitattributes; git ls-files | grep -iE "claude|plan|specstory" | grep -v "^.specstory/history" | head`
+
+```text
+48-
+49-def output(args, cwd=None):
+50-    return subprocess.check_output(args, cwd=cwd, text=True).strip()
+51-
+52-
+53-def excluded(name):
+54-    return any(name == root or name.startswith(root + "/") for root in EXCLUDED)
+55-
+56-
+57-def check_names(names, required):
+58-    names = set(names)
+59-    if any(excluded(name) for name in names):
+60:        raise ValueError("distribution contains conversation or agent plan evidence")
+--
+138-        archive = directory / "source.tar.gz"
+139-        with archive.open("wb") as stream:
+140-            run(["git", "archive", "--format=tar.gz", oid], clone, stdout=stream)
+141-        source = directory / "source"
+142-        source.mkdir()
+143-        result["source"] = check_source(archive, required, source)
+144-        suffix = ".exe" if os.name == "nt" else ""
+145-        build_and_smoke(source, directory / ("source-binary" + suffix), config, version)
+146-        result["source"]["build_and_smoke"] = "passed"
+147-
+148-        # The Go command ignores export-ignore/export-subst. Apply that override
+149-        # only inside this throwaway clone, so markers (not archive rules) are
+150:        # what remove evidence from the independently generated module ZIP.
+# Development evidence stays in Git, not source/module distributions.
+/.specstory export-ignore
+/.specstory/** export-ignore
+/.claude/plans export-ignore
+/.claude/plans/** export-ignore
+/.codex/plans export-ignore
+/.codex/plans/** export-ignore
+/.cursor/plans export-ignore
+/.cursor/plans/** export-ignore
+/.opencode/plans export-ignore
+/.opencode/plans/** export-ignore
+* text=auto eol=lf
+.claude/plans/pasted-content-id-c2e7-e-g-lazy-sifakis.md
+.claude/settings.json
+.claude/skills/go-cli-tui
+.specstory/.project.json
+.specstory/cli/config.toml
+.specstory/go.mod
+".specstory/references/chatgpt-\347\265\261\344\270\200\345\245\227\344\273\266\347\256\241\347\220\206\345\267\245\345\205\267-20260924-2021.md"
+internal/bootstrap/plan.go
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:05:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check exclusion roots and go.mod markers
+
+`grep -n "EXCLUDED\s*=" -A3 scripts/check-distribution.py; git ls-files | grep "go.mod$"; git show 6ca7167 --stat | tail -5; git show v0.1.4:.specstory/go.mod`
+
+```text
+20:EXCLUDED = (".specstory", ".claude/plans", ".codex/plans", ".cursor/plans", ".opencode/plans")
+21-XMOD_VERSION = "v0.38.0"
+22-XMOD_SUMS = """golang.org/x/mod v0.38.0 h1:MECBjubtXD7yj4HrhIUcywNaGeNVUdfVnxmPajOk4yk=
+23-golang.org/x/mod v0.38.0/go.mod h1:V6Xz0pq8TQ3dGqVQ1FVHuelZpAL0uNhSkk9ogYP3c40=
+.specstory/go.mod
+go.mod
+ .../pasted-content-id-c2e7-e-g-lazy-sifakis.md     |   83 +
+ .specstory/.project.json                           |    2 +
+ ...-25-21Z-chatgpt-specstory-references-chatgpt.md | 5378 +++++++++++++++++---
+ .../2026-10-15_14-17-45Z-image-hash-2-pasted.md    | 3764 ++++++++++++++
+ 4 files changed, 8633 insertions(+), 594 deletions(-)
+// Development evidence is not part of the parent Go module.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:05:33Z)**_
+
+<think><details><summary>Thought Process</summary>
+Found it: the backup commit included `.claude/plans/...sifakis.md`, which `.gitattributes` excludes from `git archive` but not from the Go module zip since that only respects nested `go.mod` boundaries like `.specstory/` has. I'll fix this by adding a matching `.claude/plans/go.mod` marker file, following the existing convention.
+
+</details></think>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:05:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Add go.mod boundary for plans and run distribution check
+
+```bash
+git show HEAD:.specstory/go.mod > .claude/plans/go.mod && cat .claude/plans/go.mod && git add .claude/plans/go.mod && git commit -q -m "fix: keep committed agent plans out of the Go module
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" && python3 scripts/check-distribution.py 2>&1 | tail -4
+```
+
+```text
+// Development evidence is not part of the parent Go module.
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['go', 'build', '-mod=readonly', '-buildvcs=false', '-ldflags', '-X github.com/daviddwlee84/lazypkg/internal/cli.Version=distribution-check', '-o', '/var/folders/xz/b1n4y0mn3lj6qs5ydgypj2r80000gn/T/go-distribution-check-xurcpy7v/module-binary', './cmd/lazypkg']' returned non-zero exit status 1.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:05:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm failure cause is disk space
+
+`python3 scripts/check-distribution.py 2>&1 | grep -iE "no space|evidence|error:" | head -5; df -h /System/Volumes/Data | tail -1`
+
+```text
+compile: writing output: write $WORK/b133/_pkg_.a: no space left on device
+compile: writing output: write $WORK/b228/_pkg_.a: no space left on device
+can't create $WORK/b251/_pkg_.a: open $WORK/b251/_pkg_.a: no space left on device
+compile: writing output: write $WORK/b221/_pkg_.a: no space left on device
+subprocess.CalledProcessError: Command '['go', 'build', '-mod=readonly', '-buildvcs=false', '-ldflags', '-X github.com/daviddwlee84/lazypkg/internal/cli.Version=distribution-check', '-o', '/var/folders/xz/b1n4y0mn3lj6qs5ydgypj2r80000gn/T/go-distribution-check-08ri5og9/module-binary', './cmd/lazypkg']' returned non-zero exit status 1.
+/dev/disk3s5   460Gi   418Gi   145Mi   100%    6.3M  1.5M   81%   /System/Volumes/Data
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 03:05:50Z)**_
+
+<think><details><summary>Thought Process</summary>
+The fix works—the script now reaches the build step and only fails due to local disk space (145 MB left, Data volume full), the same issue as before. The fix is committed locally but not pushed, and since the existing v0.2.0 tag's release workflow failed with no artifacts, I need your decision on how to handle this given the repo's policy of treating tags as immutable.
+
+</details></think>
+
+_**Agent (claude-opus-5-5 2026-10-16 04:18:05Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="AskUserQuestion"><details>
+<summary>Tool use: **AskUserQuestion**</summary>
+**The v0.2.0 tag is already pushed, but its release failed. How should I publish?**
+
+Options:
+- **Release v0.2.1 (Recommended)** - Leave the v0.2.0 tag alone (no release ever exists for it) and add a v0.2.1 CHANGELOG entry for this fix. Follows the repo's immutable-tag rule, with no risk of a Go checksum DB/proxy mismatch.
+- **Move the v0.2.0 tag** - Delete the remote v0.2.0 tag and re-tag it on the fixed commit. Keeps the number, but if the Go proxy or sum.golang.org has already recorded v0.2.0, go install will fail its checksum.
+- **Push main only for now** - Push only the fix commit and decide on the release later.
+
+
+**Answer:** Release v0.2.1 (Recommended)
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 04:18:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Bump to v0.2.1 and rerun quick checks
+
+```bash
+python3 - <<'EOF'
+def edit(p, old, new, count=1):
+    s=open(p).read(); assert old in s, (p, old); open(p,'w').write(s.replace(old,new,count))
+edit('internal/cli/root.go','const BaseVersion = "v0.2.0"','const BaseVersion = "v0.2.1"')
+edit('README.md','The current version is **v0.2.0**','The current version is **v0.2.1**')
+edit('README.md','''**v0.2.0** labels each''','''**v0.2.1** (first published v0.2 release) labels each''')
+edit('README.md','lazypkg@v0.2.0','lazypkg@v0.2.1')
+edit('README.md','`v0.2.0-dev`','`v0.2.1-dev`')
+edit('docs/distribution.md','Version **v0.2.0**','Version **v0.2.1**')
+edit('docs/distribution.md','lazypkg@v0.2.0','lazypkg@v0.2.1')
+edit('docs/distribution.md','inject v0.2.0','inject v0.2.1')
+edit('CHANGELOG.md','## Unreleased\n\n\n','## Unreleased\n\n\n## v0.2.1 - 2026-10-16\n\n- Publish the v0.2.0 changes. The v0.2.0 tag has no release: its Go module would have included a committed agent plan, so `.claude/plans` now has the same nested `go.mod` boundary as `.specstory`.\n\n')
+EOF
+grep -rn "v0\.2\.0" README.md docs internal/cli/root.go; go test ./internal/cli 2>&1 | tail -1; python3 -m unittest discover -s scripts -p 'test_*release*.py' 2>&1 | tail -1
+```
+
+```text
+ok  	github.com/daviddwlee84/lazypkg/internal/cli	0.628s
+OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 04:18:18Z)**_
+
+Before pushing, I'm confirming that the `release-contract` job was the only CI failure:
+
+_**Agent (claude-opus-5-5 2026-10-16 04:18:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List CI job conclusions
+
+`gh run view 38843423744 --json jobs --jq '.jobs[] | "\(.conclusion)\t\(.name)"'`
+
+```text
+failure	release-contract
+success	test (windows-latest)
+success	test (ubuntu-latest)
+success	test (macos-latest)
+success	catalog
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 04:18:23Z)**_
+
+Only `release-contract` failed; tests on all three OSes passed. Committing, tagging v0.2.1 and pushing:
+
+_**Agent (claude-opus-5-5 2026-10-16 04:18:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit, tag v0.2.1 and push to main
+
+```bash
+git add CHANGELOG.md README.md docs/distribution.md internal/cli/root.go && git commit -q -m "chore: release v0.2.1
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" && git fetch -q origin && git merge-base --is-ancestor origin/main HEAD && git tag -a v0.2.1 -m "Release v0.2.1: update classification, Updates sort/filter, content-sized columns" && git branch -f main HEAD && git push origin main v0.2.1 2>&1 | tail -3
+```
+
+```text
+To https://github.com/daviddwlee84/lazypkg.git
+   57f4caf..e027313  main -> main
+ * [new tag]         v0.2.1 -> v0.2.1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 04:21:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Wait for v0.2.1 release workflow and inspect release
+
+`sleep 15; id=$(gh run list --workflow Release --limit 1 --json databaseId,headBranch --jq '.[0].databaseId'); gh run watch "$id" --exit-status --interval 20 >/dev/null 2>&1; echo "release exit $?"; gh run list --limit 2; gh release view v0.2.1 --json isDraft,url,assets --jq '{draft: .isDraft, url: .url, assets: [.assets[].name]}' 2>&1`
+
+```text
+release exit 0
+completed	success	chore: release v0.2.1	CI	main	push	38849950193	1m40s	2026-10-16T04:18:32Z
+completed	success	chore: release v0.2.1	Release	v0.2.1	push	38849949680	3m8s	2026-10-16T04:18:32Z
+{"assets":["checksums.txt","lazypkg_0.2.1_darwin_amd64.tar.gz","lazypkg_0.2.1_darwin_arm64.tar.gz","lazypkg_0.2.1_linux_amd64.tar.gz","lazypkg_0.2.1_linux_arm64.tar.gz","lazypkg_0.2.1_source.tar.gz"],"draft":false,"url":"https://github.com/daviddwlee84/lazypkg/releases/tag/v0.2.1"}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 04:22:06Z)**_
+
+v0.2.1 is published and pushed to main. CI and the Release workflow both passed on all three OSes: https://github.com/daviddwlee84/lazypkg/releases/tag/v0.2.1
+
+It has the usual 4 binaries (darwin/linux × amd64/arm64), the source archive and `checksums.txt`, and it isn't a draft.
+
+**Why it's v0.2.1 and not v0.2.0**
+- The first push, tagged v0.2.0, failed the `release-contract` check, so no v0.2.0 release was created.
+- The cause: the "backup chat history" commit also committed my planning file in `.claude/plans/`. `.gitattributes` already keeps it out of the source archive, but the Go module zip only skips folders that have their own `go.mod`. `.specstory/` has one; `.claude/plans/` didn't.
+- The fix adds `.claude/plans/go.mod`, the same marker `.specstory` uses, so committed plans no longer end up in the module.
+- As you chose, the v0.2.0 tag stays as it is, and the CHANGELOG explains why it has no release.
+
+**Things to know**
+- **Your disk is almost full**: the Data volume is at 100% with about 145 MB left. Because of that, the local `goreleaser` snapshot and `check-distribution.py` couldn't finish; they stopped with "no space left on device" partway through the build. CI ran the same checks in full and they passed. The Go build cache is about 800 MB, and `go clean -cache` would clear it.
+- The Homebrew tap updates separately, so `brew upgrade` won't see v0.2.1 until the formula is published there.
+- Your terminal is still on the `feat/update-kind-columns` branch. Local `main` points at the same commit as the pushed one. I didn't switch branches because `.specstory` is still being written, and the branch can be deleted whenever you like.
+
+---
+
+_**User (2026-10-16 05:54:42Z)**_
+
+```
+
+
+<pasted_content id="c2e7">
+lazypkg on  feat/update-kind-columns [!] via  v1.27.0 took 2s
+❯ brew upgrade lazypkg
+HOMEBREW_BREW_GIT_REMOTE set: using https://mirrors.bfsu.edu.cn/git/homebrew/brew.git as the Homebrew/brew Git remote.
+remote: Enumerating objects: 132, done.
+remote: Counting objects: 100% (78/78), done.
+remote: Compressing objects: 100% (39/39), done.
+remote: Total 132 (delta 70), reused 39 (delta 39), pack-reused 54
+Receiving objects: 100% (132/132), 223.86 KiB | 3.20 MiB/s, done.
+Resolving deltas: 100% (76/76), completed with 10 local objects.
+From https://mirrors.bfsu.edu.cn/git/homebrew/brew
+   92b8ea8ebd..be9411f7d2  main       -> origin/main
+==> Auto-updating Homebrew...
+Adjust how often this is run with `$HOMEBREW_AUTO_UPDATE_SECS` or disable with
+`$HOMEBREW_NO_AUTO_UPDATE=1`. Hide these hints with `$HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+==> Auto-updated Homebrew!
+==> Updated Homebrew from 92b8ea8ebd to be9411f7d2.
+Updated 4 taps (hashicorp/tap, marcus/tap, steipete/tap and supabase/tap).
+
+You have 203 outdated formulae and 34 outdated casks installed.
+
+Warning: daviddwlee84/tap/lazypkg 0.1.4 already installed
+</pasted_content id="c2e7">
+
+```
+
+幫我看一下deploy狀況
+
+---
+
+_**Agent (claude-opus-5-5 2026-10-16 05:54:46Z)**_
+
+Checking the tap repo to see how it publishes formulas:
+
+_**Agent (claude-opus-5-5 2026-10-16 05:54:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect tap formula and its workflows
+
+`gh api repos/daviddwlee84/homebrew-tap/contents/Formula/lazypkg.rb --jq '.content' 2>&1 | base64 -d 2>/dev/null | head -12; gh workflow list -R daviddwlee84/homebrew-tap 2>&1; gh run list -R daviddwlee84/homebrew-tap --limit 5 2>&1`
+
+```text
+class Lazypkg < Formula
+  desc "Software inventory and reviewed package-manager operations"
+  homepage "https://github.com/daviddwlee84/lazypkg"
+  license "MIT"
+
+  on_macos do
+    on_arm do
+      url "https://github.com/daviddwlee84/lazypkg/releases/download/v0.1.4/lazypkg_0.1.4_darwin_arm64.tar.gz"
+      sha256 "e4b4ced7235987e138f210b4d58d87c38b5b6e478e349c63244d1d1f8a4d16d3"
+    end
+    on_intel do
+      url "https://github.com/daviddwlee84/lazypkg/releases/download/v0.1.4/lazypkg_0.1.4_darwin_amd64.tar.gz"
+CI	active	363124260
+Sync stable formulas	active	363124261
+completed	success	Sync stable formulas	Sync stable formulas	main	schedule	38834848782	36s	2026-10-16T01:23:24Z
+completed	success	Sync stable formulas	Sync stable formulas	main	schedule	38816581046	38s	2026-10-15T22:21:49Z
+completed	success	Sync stable formulas	Sync stable formulas	main	schedule	38791793422	34s	2026-10-15T19:11:04Z
+completed	success	Sync stable formulas	Sync stable formulas	main	schedule	38756920015	37s	2026-10-15T15:03:20Z
+completed	success	Sync stable formulas	Sync stable formulas	main	schedule	38716847707	25s	2026-10-15T09:58:09Z
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 05:54:56Z)**_
+
+<think><details><summary>Thought Process</summary>
+The tap formula is still at v0.1.4 since the "Sync stable formulas" workflow last ran before the v0.2.1 release went out. I'll check its schedule and see if it can be triggered manually.
+
+</details></think>
+
+_**Agent (claude-opus-5-5 2026-10-16 05:54:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read tap workflow triggers
+
+`gh api repos/daviddwlee84/homebrew-tap/contents/.github/workflows --jq '.[].name'; for f in $(gh api repos/daviddwlee84/homebrew-tap/contents/.github/workflows --jq '.[].path'); do gh api "repos/daviddwlee84/homebrew-tap/contents/$f" --jq .content | base64 -d | grep -nE "^name|cron|workflow_dispatch|inputs" ; done; date -u +%H:%MZ`
+
+```text
+ci.yml
+sync.yml
+1:name: CI
+1:name: Sync stable formulas
+4:  workflow_dispatch:
+5:    inputs:
+15:    - cron: "17 * * * *"
+49:          SYNC_TOOL: ${{ inputs.tool }}
+50:          SYNC_BOOTSTRAP: ${{ inputs.bootstrap }}
+05:54Z
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 05:55:04Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read sync workflow inputs
+
+`gh api repos/daviddwlee84/homebrew-tap/contents/.github/workflows/sync.yml --jq .content | base64 -d | sed -n 1,20p`
+
+```text
+name: Sync stable formulas
+
+on:
+  workflow_dispatch:
+    inputs:
+      tool:
+        description: Comma-separated formula names; leave empty to sync all thirteen tools
+        type: string
+        default: ""
+      bootstrap:
+        description: Initialize existing formulas after full asset and install validation
+        type: boolean
+        default: false
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 05:55:08Z)**_
+
+<think><details><summary>Thought Process</summary>
+The scheduled hourly cron hasn't run since 01:23Z despite it being 05:54Z now, so I'll manually trigger it for `lazypkg`.
+
+</details></think>
+
+_**Agent (claude-opus-5-5 2026-10-16 05:56:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Dispatch tap sync for lazypkg and wait
+
+`gh workflow run sync.yml -R daviddwlee84/homebrew-tap -f tool=lazypkg && sleep 10 && id=$(gh run list -R daviddwlee84/homebrew-tap --workflow sync.yml --limit 1 --json databaseId --jq '.[0].databaseId') && gh run watch "$id" -R daviddwlee84/homebrew-tap --exit-status --interval 10 >/dev/null 2>&1; echo "exit $?"; gh run list -R daviddwlee84/homebrew-tap --limit 3; gh api repos/daviddwlee84/homebrew-tap/contents/Formula/lazypkg.rb --jq .content | base64 -d | grep -m1 url`
+
+```text
+https://github.com/daviddwlee84/homebrew-tap/actions/runs/38858311829
+exit 0
+completed	success	Sync stable formulas	Sync stable formulas	main	workflow_dispatch	38858311829	1m17s	2026-10-16T05:55:12Z
+completed	success	Sync stable formulas	Sync stable formulas	main	schedule	38834848782	36s	2026-10-16T01:23:24Z
+completed	success	Sync stable formulas	Sync stable formulas	main	schedule	38816581046	38s	2026-10-15T22:21:49Z
+      url "https://github.com/daviddwlee84/lazypkg/releases/download/v0.2.1/lazypkg_0.2.1_darwin_arm64.tar.gz"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 05:56:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check tap CI after formula update
+
+`sleep 30; gh run list -R daviddwlee84/homebrew-tap --workflow ci.yml --limit 1`
+
+```text
+<tool_use_error>Blocked: sleep 30 followed by: gh run list -R daviddwlee84/homebrew-tap --workflow ci.yml --limit 1. To wait for a condition, use Monitor with an until-loop (e.g. `until <check>; do sleep 2; done`). To wait for a command you started, use run_in_background: true. Do not chain shorter sleeps to work around this block.</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 05:56:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check tap CI and latest commit
+
+`gh run list -R daviddwlee84/homebrew-tap --workflow ci.yml --limit 2; gh api repos/daviddwlee84/homebrew-tap/commits --jq '.[0] | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"'`
+
+```text
+completed	success	test: verify installed lazy tool upgrade ownership in Homebrew smoke	CI	main	push	36096510329	12s	2026-09-25T04:56:56Z
+completed	success	test: cover the expanded thirteen-tool registry	CI	main	push	36096469251	45s	2026-09-25T04:56:18Z
+c3a3ed5 Sync validated stable release formulas
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5-5 2026-10-16 05:56:54Z)**_
+
+Deployment is finished. The Homebrew tap's `lazypkg` formula now points to **v0.2.1**.
+
+**Why `brew upgrade` still said 0.1.4:**
+- The tap doesn't update when a release is published. Its "Sync stable formulas" workflow updates it, and that workflow is set to run every hour at :17.
+- GitHub has been delaying that schedule: before this, the last run was at 01:23Z, while v0.2.1 was published around 04:21Z. When you ran `brew upgrade`, the tap still had 0.1.4.
+
+**What I did:** I triggered the same sync manually for `lazypkg` only, without changing its settings. The run passed in 1m17s and committed `c3a3ed5 Sync validated stable release formulas` to the tap. The formula's darwin_arm64 download now points to the v0.2.1 file.
+
+The tap's own CI didn't run for that commit, and none of the earlier sync commits triggered it either.
+
+Run this again to upgrade:
+```sh
+brew upgrade lazypkg        # if brew doesn't auto-update the tap, run brew update first
+lazypkg --version           # should print v0.2.1
+```
+`lazypkg self upgrade --check` also works now.
+
+If you don't want to wait for the delayed schedule after future releases, you can trigger the sync yourself right after the release finishes:
+```sh
+gh workflow run sync.yml -R daviddwlee84/homebrew-tap -f tool=lazypkg
+```
